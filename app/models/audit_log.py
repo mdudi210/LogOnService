@@ -22,6 +22,6 @@ class AuditLog(Base):
 
     event_type: Mapped[str] = mapped_column(String(100))
     ip_address: Mapped[str] = mapped_column(String(50))
-    metadata: Mapped[dict] = mapped_column(JSONB)
+    event_metadata: Mapped[dict] = mapped_column("metadata", JSONB)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

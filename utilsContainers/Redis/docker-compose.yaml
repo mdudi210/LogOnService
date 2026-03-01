@@ -1,0 +1,26 @@
+services:
+  redis_cache:
+    image: redis:${REDIS_IMAGE_TAG:-7-alpine}
+    container_name: ${REDIS_CONTAINER_NAME:-logonservice-redis}
+    restart: unless-stopped
+    ports:
+      - "${REDIS_HOST_PORT:-6379}:6379"
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+    command: >
+      sh -c 'if [ -n "$$REDIS_PASSWORD" ]; then
+      exec redis-server --appendonly yes --save 60 1000 --requirepass "$$REDIS_PASSWORD";
+      else
+      exec redis-server --appendonly yes --save 60 1000;
+      fi'
+    healthcheck:
+      test: ["CMD-SHELL", "if [ -n \"$$REDIS_PASSWORD\" ]; then redis-cli -a \"$$REDIS_PASSWORD\" ping | grep PONG; else redis-cli ping | grep PONG; fi"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      # Can be a named volume (redis_data), local path (./data), or server path (/mnt/redis/logonservice)
+      - ${REDIS_DATA_MOUNT:-redis_data}:/data
+
+volumes:
+  redis_data:

@@ -1,0 +1,23 @@
+services:
+  postgres_db:
+    image: postgres:${POSTGRES_IMAGE_TAG:-16-alpine}
+    container_name: ${POSTGRES_CONTAINER_NAME:-logonservice-postgres}
+    restart: unless-stopped
+    ports:
+      - "${POSTGRES_HOST_PORT:-5432}:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-logonservice}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-logonservice}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    volumes:
+      # Can be a named volume (postgres_data), local path (./data), or server path (/mnt/postgres/logonservice)
+      - ${POSTGRES_DATA_MOUNT:-postgres_data}:/var/lib/postgresql/data
+      - ./initdb:/docker-entrypoint-initdb.d:ro
+
+volumes:
+  postgres_data:
