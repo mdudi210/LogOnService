@@ -19,7 +19,7 @@ class DummyUser:
 
 
 def test_login_success(monkeypatch) -> None:
-    def fake_login(self, email_or_username: str, password: str):
+    async def fake_login(self, email_or_username: str, password: str):
         return DummyUser()
 
     monkeypatch.setattr("app.services.auth_service.AuthService.login", fake_login)
@@ -33,10 +33,13 @@ def test_login_success(monkeypatch) -> None:
     data = response.json()
     assert data["message"] == "Login successful"
     assert data["user"]["role"] == "admin"
+    cookies = response.headers.get_list("set-cookie")
+    assert any("access_token=" in item for item in cookies)
+    assert any("refresh_token=" in item for item in cookies)
 
 
 def test_login_invalid_credentials(monkeypatch) -> None:
-    def fake_login(self, email_or_username: str, password: str):
+    async def fake_login(self, email_or_username: str, password: str):
         raise InvalidCredentialsError("Invalid credentials")
 
     monkeypatch.setattr("app.services.auth_service.AuthService.login", fake_login)

@@ -22,6 +22,7 @@ CREATE TABLE IF NOT EXISTS user_credentials (
     id UUID PRIMARY KEY,
     user_id UUID NOT NULL UNIQUE REFERENCES users(id) ON DELETE CASCADE,
     password_hash TEXT NOT NULL,
+    password_salt VARCHAR(255) NULL,
     hash_algorithm TEXT NOT NULL DEFAULT 'argon2id',
     password_changed_at TIMESTAMP NOT NULL,
     created_at TIMESTAMP NOT NULL

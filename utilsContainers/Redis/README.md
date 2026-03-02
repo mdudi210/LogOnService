@@ -1,51 +1,35 @@
 # Redis Dev Container (Generic)
 
-This setup is portable for all developers and configurable via environment variables.
+Portable local Redis setup with configurable storage and optional password.
 
-## 1) Create local env file
-
-From `utilsContainers/Redis`:
-
+## Setup
 ```bash
+cd /Users/manishdudi/Desktop/LogOnService/utilsContainers/Redis
 cp .env.example .env
-```
-
-## 2) Choose storage mode
-
-In `.env`, set `REDIS_DATA_MOUNT`:
-
-- `redis_data` (default named Docker volume)
-- `./data` (bind mount to your local machine)
-- `/mnt/redis/logonservice` (server path later)
-
-## 3) Start Redis
-
-```bash
 docker compose --env-file .env -f docker-compose.yaml up -d
 ```
 
-## 4) Stop Redis
-
-```bash
-docker compose --env-file .env -f docker-compose.yaml down
-```
-
-## 5) Verify Redis
-
+## Verify
 ```bash
 docker compose --env-file .env -f docker-compose.yaml exec -T redis_cache redis-cli ping
 ```
 
-## App Redis URL
-
-Without password:
-
+## App Connection URL
+- No password:
 ```bash
 REDIS_URL=redis://localhost:${REDIS_HOST_PORT:-6379}/0
 ```
-
-With password:
-
+- With password:
 ```bash
 REDIS_URL=redis://:${REDIS_PASSWORD}@localhost:${REDIS_HOST_PORT:-6379}/0
+```
+
+## Storage Modes (`REDIS_DATA_MOUNT`)
+- `redis_data` (named volume, default)
+- `./data` (local bind)
+- `/mnt/redis/logonservice` (server path)
+
+## Stop
+```bash
+docker compose --env-file .env -f docker-compose.yaml down
 ```

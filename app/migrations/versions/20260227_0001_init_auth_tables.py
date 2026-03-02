@@ -67,6 +67,7 @@ def upgrade() -> None:
         sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("user_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("password_hash", sa.Text(), nullable=False),
+        sa.Column("password_salt", sa.String(length=255), nullable=True),
         sa.Column("hash_algorithm", sa.Text(), nullable=False),
         sa.Column("password_changed_at", sa.DateTime(), nullable=False),
         sa.Column("created_at", sa.DateTime(), nullable=False),

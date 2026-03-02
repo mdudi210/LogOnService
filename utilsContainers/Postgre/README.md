@@ -1,60 +1,40 @@
 # PostgreSQL Dev Container (Generic)
 
-This setup is portable for all developers and configurable via environment variables.
+Portable local PostgreSQL setup with configurable storage and credentials.
 
-## 1) Create local env file
-
-From `utilsContainers/Postgre`:
-
+## Setup
 ```bash
+cd /Users/manishdudi/Desktop/LogOnService/utilsContainers/Postgre
 cp .env.example .env
-```
-
-## 2) Choose storage mode
-
-In `.env`, set `POSTGRES_DATA_MOUNT`:
-
-- `postgres_data` (default named Docker volume)
-- `./data` (bind mount to your local machine)
-- `/mnt/postgres/logonservice` (server path later)
-
-## 3) Start Postgres
-
-```bash
 docker compose --env-file .env -f docker-compose.yaml up -d
 ```
 
-## 4) Apply schema (current models)
+## Apply Schema via Alembic (Recommended)
+```bash
+cd /Users/manishdudi/Desktop/LogOnService
+source .venv/bin/activate
+export DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:${POSTGRES_HOST_PORT:-5432}/${POSTGRES_DB:-logonservice}
+alembic upgrade head
+```
 
+## Seed Dev Users
 ```bash
 docker compose --env-file .env -f docker-compose.yaml exec -T postgres_db \
-  psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -f /docker-entrypoint-initdb.d/00-init.sql
+  psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -f /docker-entrypoint-initdb.d/10-seed-test-users.sql
 ```
 
-## 5) Stop Postgres
+## Verify
+```bash
+docker compose --env-file .env -f docker-compose.yaml exec -T postgres_db \
+  psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -c "\\dt"
+```
 
+## Storage Modes (`POSTGRES_DATA_MOUNT`)
+- `postgres_data` (named volume, default)
+- `./data` (local bind)
+- `/mnt/postgres/logonservice` (server path)
+
+## Stop
 ```bash
 docker compose --env-file .env -f docker-compose.yaml down
-```
-
-## App Database URL
-
-```bash
-DATABASE_URL=postgresql+psycopg2://postgres:postgres@localhost:${POSTGRES_HOST_PORT:-5432}/${POSTGRES_DB:-logonservice}
-```
-
-## Migration Standard (Industry)
-
-- Canonical migration path is Alembic in `app/migrations`.
-- Install tooling once:
-
-```bash
-python3 -m pip install alembic sqlalchemy psycopg2-binary
-```
-
-- Apply migrations:
-
-```bash
-export DATABASE_URL=postgresql+psycopg2://postgres:postgres@localhost:${POSTGRES_HOST_PORT:-5432}/${POSTGRES_DB:-logonservice}
-alembic upgrade head
 ```
