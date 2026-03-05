@@ -46,6 +46,7 @@ CREATE TABLE IF NOT EXISTS sessions (
     id UUID PRIMARY KEY,
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     device_id UUID NULL REFERENCES user_devices(id) ON DELETE SET NULL,
+    jti VARCHAR(255) NOT NULL UNIQUE,
     session_started_at TIMESTAMP NOT NULL,
     session_expires_at TIMESTAMP NOT NULL,
     is_revoked BOOLEAN NOT NULL DEFAULT FALSE,
@@ -53,6 +54,7 @@ CREATE TABLE IF NOT EXISTS sessions (
 );
 
 CREATE INDEX IF NOT EXISTS ix_sessions_user_id ON sessions (user_id);
+CREATE INDEX IF NOT EXISTS ix_sessions_jti ON sessions (jti);
 
 CREATE TABLE IF NOT EXISTS user_mfa (
     id UUID PRIMARY KEY,

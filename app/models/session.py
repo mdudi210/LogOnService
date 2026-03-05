@@ -1,4 +1,4 @@
-from sqlalchemy import ForeignKey, Boolean, DateTime
+from sqlalchemy import Boolean, DateTime, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.dialects.postgresql import UUID
 from datetime import datetime
@@ -23,6 +23,13 @@ class Session(Base):
         UUID(as_uuid=True),
         ForeignKey("user_devices.id", ondelete="SET NULL"),
         nullable=True
+    )
+
+    jti: Mapped[str] = mapped_column(
+        String(255),
+        unique=True,
+        index=True,
+        nullable=False
     )
 
     session_started_at: Mapped[datetime] = mapped_column(

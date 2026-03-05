@@ -22,7 +22,18 @@ def test_login_success(monkeypatch) -> None:
     async def fake_login(self, email_or_username: str, password: str):
         return DummyUser()
 
+    async def fake_persist_refresh_jti(**kwargs):
+        return None
+
+    async def fake_create_session(self, **kwargs):
+        return None
+
     monkeypatch.setattr("app.services.auth_service.AuthService.login", fake_login)
+    monkeypatch.setattr("app.api.routes.auth.persist_refresh_jti", fake_persist_refresh_jti)
+    monkeypatch.setattr(
+        "app.repositories.session_repository.SessionRepository.create_session",
+        fake_create_session,
+    )
 
     response = client.post(
         "/auth/login",

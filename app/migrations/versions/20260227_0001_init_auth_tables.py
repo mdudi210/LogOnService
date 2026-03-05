@@ -109,6 +109,7 @@ def upgrade() -> None:
         sa.Column("id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("user_id", postgresql.UUID(as_uuid=True), nullable=False),
         sa.Column("device_id", postgresql.UUID(as_uuid=True), nullable=True),
+        sa.Column("jti", sa.String(length=255), nullable=False),
         sa.Column("session_started_at", sa.DateTime(), nullable=False),
         sa.Column("session_expires_at", sa.DateTime(), nullable=False),
         sa.Column("is_revoked", sa.Boolean(), nullable=False),
@@ -116,11 +117,14 @@ def upgrade() -> None:
         sa.ForeignKeyConstraint(["device_id"], ["user_devices.id"], name=op.f("fk_sessions_device_id_user_devices"), ondelete="SET NULL"),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"], name=op.f("fk_sessions_user_id_users"), ondelete="CASCADE"),
         sa.PrimaryKeyConstraint("id", name=op.f("pk_sessions")),
+        sa.UniqueConstraint("jti", name=op.f("uq_sessions_jti")),
     )
     op.create_index(op.f("ix_sessions_user_id"), "sessions", ["user_id"], unique=False)
+    op.create_index(op.f("ix_sessions_jti"), "sessions", ["jti"], unique=False)
 
 
 def downgrade() -> None:
+    op.drop_index(op.f("ix_sessions_jti"), table_name="sessions")
     op.drop_index(op.f("ix_sessions_user_id"), table_name="sessions")
     op.drop_table("sessions")
     op.drop_table("user_mfa")

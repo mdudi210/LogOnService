@@ -1,17 +1,26 @@
 from typing import Dict
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.deps import get_current_user
 from app.core.config import settings
 from app.core.database import get_db
+from app.models.user import User
+from app.repositories.session_repository import SessionRepository
 from app.schemas.auth import LoginRequest, LoginResponse, LoginUser, RefreshResponse
 from app.services.token_service import (
+    RefreshTokenReuseDetectedError,
     TokenValidationError,
+    build_refresh_session_expiry,
     clear_auth_cookies,
     create_access_token,
     create_refresh_token,
+    persist_refresh_jti,
+    revoke_all_user_sessions_and_tokens,
+    revoke_jti,
+    rotate_refresh_token_or_revoke_all,
     set_auth_cookies,
     verify_refresh_token,
 )
@@ -50,8 +59,18 @@ async def login(
             detail="User account is inactive",
         )
 
+    refresh_jti = str(uuid4())
     access_token = create_access_token(user_id=str(user.id), role=user.role)
-    refresh_token = create_refresh_token(user_id=str(user.id), role=user.role)
+    refresh_token = create_refresh_token(
+        user_id=str(user.id), role=user.role, jti=refresh_jti
+    )
+
+    await persist_refresh_jti(user_id=str(user.id), jti=refresh_jti)
+    await SessionRepository(db).create_session(
+        user_id=user.id,
+        jti=refresh_jti,
+        session_expires_at=build_refresh_session_expiry(),
+    )
     set_auth_cookies(response, access_token, refresh_token)
 
     return LoginResponse(
@@ -90,13 +109,52 @@ async def refresh_tokens(
     if user is None or user.deleted_at is not None or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
 
-    access_token = create_access_token(user_id=str(user.id), role=user.role)
-    new_refresh_token = create_refresh_token(user_id=str(user.id), role=user.role)
+    current_jti = payload["jti"]
+    new_jti = str(uuid4())
+    try:
+        access_token, new_refresh_token = await rotate_refresh_token_or_revoke_all(
+            db=db,
+            user_id=str(user.id),
+            current_jti=current_jti,
+            new_jti=new_jti,
+            role=user.role,
+        )
+    except RefreshTokenReuseDetectedError:
+        clear_auth_cookies(response)
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token reuse detected. All sessions revoked.",
+        )
+
     set_auth_cookies(response, access_token, new_refresh_token)
     return RefreshResponse(message="Token refresh successful")
 
 
 @router.post("/logout", response_model=RefreshResponse)
-def logout(response: Response) -> RefreshResponse:
+async def logout(
+    request: Request,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+) -> RefreshResponse:
+    refresh_token = request.cookies.get(settings.REFRESH_COOKIE_NAME)
+    if refresh_token:
+        try:
+            payload = verify_refresh_token(refresh_token)
+            await revoke_jti(user_id=payload["sub"], jti=payload["jti"])
+            await SessionRepository(db).revoke_session_by_jti(payload["jti"])
+        except TokenValidationError:
+            pass
+
     clear_auth_cookies(response)
     return RefreshResponse(message="Logout successful")
+
+
+@router.post("/logout-all", response_model=RefreshResponse)
+async def logout_all_devices(
+    response: Response,
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> RefreshResponse:
+    await revoke_all_user_sessions_and_tokens(db=db, user_id=str(current_user.id))
+    clear_auth_cookies(response)
+    return RefreshResponse(message="All sessions revoked")
