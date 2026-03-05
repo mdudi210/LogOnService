@@ -21,6 +21,11 @@ class DummyUser:
         self.deleted_at = None
 
 
+def _set_csrf(client: TestClient, value: str = "csrf-token") -> dict[str, str]:
+    client.cookies.set("csrf_token", value)
+    return {"X-CSRF-Token": value}
+
+
 def test_refresh_success(monkeypatch) -> None:
     user = DummyUser()
 
@@ -47,7 +52,7 @@ def test_refresh_success(monkeypatch) -> None:
 
     with TestClient(app) as client:
         client.cookies.set("refresh_token", refresh)
-        response = client.post("/auth/refresh")
+        response = client.post("/auth/refresh", headers=_set_csrf(client))
 
         assert response.status_code == 200
         assert response.json()["message"] == "Token refresh successful"
@@ -58,9 +63,22 @@ def test_refresh_success(monkeypatch) -> None:
 
 def test_refresh_missing_cookie() -> None:
     with TestClient(app) as client:
-        response = client.post("/auth/refresh")
+        response = client.post("/auth/refresh", headers=_set_csrf(client))
         assert response.status_code == 401
         assert response.json()["detail"] == "Missing refresh token"
+
+
+def test_refresh_missing_csrf_header() -> None:
+    user = DummyUser()
+    refresh = create_refresh_token(user_id=str(user.id), role=user.role)
+
+    with TestClient(app) as client:
+        client.cookies.set("refresh_token", refresh)
+        client.cookies.set("csrf_token", "csrf-token")
+        response = client.post("/auth/refresh")
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "CSRF validation failed"
 
 
 def test_refresh_reuse_detection(monkeypatch) -> None:
@@ -85,7 +103,7 @@ def test_refresh_reuse_detection(monkeypatch) -> None:
 
     with TestClient(app) as client:
         client.cookies.set("refresh_token", refresh)
-        response = client.post("/auth/refresh")
+        response = client.post("/auth/refresh", headers=_set_csrf(client))
 
     assert response.status_code == 401
     assert response.json()["detail"] == "Refresh token reuse detected. All sessions revoked."

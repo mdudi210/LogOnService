@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.routes import auth_router, users_router
+from app.api.routes import auth_router, mfa_router, users_router
 from app.core.config import settings
 from app.core.redis import close_redis_client
 from app.middlewares.rate_limiter import RedisRateLimiterMiddleware
@@ -30,7 +30,12 @@ def create_app() -> FastAPI:
         allow_origins=settings.ALLOWED_CORS_ORIGINS,
         allow_credentials=True,
         allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-        allow_headers=["Authorization", "Content-Type", "X-Requested-With"],
+        allow_headers=[
+            "Authorization",
+            "Content-Type",
+            "X-Requested-With",
+            settings.CSRF_HEADER_NAME,
+        ],
     )
     app.add_middleware(RedisRateLimiterMiddleware)
 
@@ -39,6 +44,7 @@ def create_app() -> FastAPI:
         return {"status": "ok", "service": "logonservice"}
 
     app.include_router(auth_router)
+    app.include_router(mfa_router)
     app.include_router(users_router)
     return app
 

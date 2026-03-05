@@ -16,6 +16,8 @@ class DummyUser:
         self.username = "admin_test"
         self.role = "admin"
         self.is_verified = True
+        self.mfa_enabled = False
+        self.totp_secret = None
 
 
 def test_login_success(monkeypatch) -> None:
@@ -47,6 +49,7 @@ def test_login_success(monkeypatch) -> None:
     cookies = response.headers.get_list("set-cookie")
     assert any("access_token=" in item for item in cookies)
     assert any("refresh_token=" in item for item in cookies)
+    assert any("csrf_token=" in item for item in cookies)
 
 
 def test_login_invalid_credentials(monkeypatch) -> None:
