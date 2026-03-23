@@ -5,6 +5,7 @@ from logging.config import fileConfig
 import os
 
 from alembic import context
+from dotenv import load_dotenv
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
@@ -17,12 +18,23 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
+load_dotenv()
+
+
+def _normalize_async_db_url(url: str) -> str:
+    if url.startswith("postgresql+psycopg2://"):
+        return url.replace("postgresql+psycopg2://", "postgresql+asyncpg://", 1)
+    if url.startswith("postgresql://"):
+        return url.replace("postgresql://", "postgresql+asyncpg://", 1)
+    return url
+
 
 def get_database_url() -> str:
-    return os.getenv(
+    url = os.getenv(
         "DATABASE_URL",
         config.get_main_option("sqlalchemy.url"),
     )
+    return _normalize_async_db_url(url)
 
 
 target_metadata = Base.metadata

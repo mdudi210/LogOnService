@@ -1,7 +1,7 @@
 from uuid import UUID
-from typing import Callable, Set
+from typing import Callable, Optional, Set
 
-from fastapi import Depends, HTTPException, Request, status
+from fastapi import Cookie, Depends, Header, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -29,12 +29,57 @@ def _get_access_payload_or_401(request: Request) -> dict:
         )
 
 
-async def verify_csrf(request: Request) -> None:
+def require_access_cookie(
+    access_token: Optional[str] = Cookie(
+        default=None,
+        alias=settings.ACCESS_COOKIE_NAME,
+        description="Required HttpOnly access token cookie for authenticated routes.",
+    ),
+) -> str:
+    if not access_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing access token",
+        )
+    return access_token
+
+
+def require_refresh_cookie(
+    refresh_token: Optional[str] = Cookie(
+        default=None,
+        alias=settings.REFRESH_COOKIE_NAME,
+        description="Required HttpOnly refresh token cookie for refresh/logout endpoints.",
+    ),
+) -> str:
+    if not refresh_token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Missing refresh token",
+        )
+    return refresh_token
+
+
+def optional_refresh_cookie(
+    refresh_token: Optional[str] = Cookie(
+        default=None,
+        alias=settings.REFRESH_COOKIE_NAME,
+        description="Optional HttpOnly refresh token cookie. If present, session is revoked on logout.",
+    ),
+) -> Optional[str]:
+    return refresh_token
+
+
+async def verify_csrf(
+    request: Request,
+    csrf_cookie: Optional[str] = Cookie(
+        default=None,
+        alias=settings.CSRF_COOKIE_NAME,
+        description="Required CSRF cookie for state-changing operations.",
+    ),
+    csrf_header: Optional[str] = Header(default=None, alias=settings.CSRF_HEADER_NAME),
+) -> None:
     if request.method not in {"POST", "PUT", "PATCH", "DELETE"}:
         return
-
-    csrf_cookie = request.cookies.get(settings.CSRF_COOKIE_NAME)
-    csrf_header = request.headers.get(settings.CSRF_HEADER_NAME)
 
     if not csrf_cookie or not csrf_header or csrf_cookie != csrf_header:
         raise HTTPException(
@@ -44,9 +89,17 @@ async def verify_csrf(request: Request) -> None:
 
 
 async def get_current_user(
-    request: Request, db: AsyncSession = Depends(get_db)
+    request: Request,
+    access_token: str = Depends(require_access_cookie),
+    db: AsyncSession = Depends(get_db),
 ) -> User:
-    payload = _get_access_payload_or_401(request)
+    try:
+        payload = verify_access_token(access_token)
+    except TokenValidationError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid access token",
+        )
 
     try:
         user_id = UUID(payload["sub"])
@@ -97,4 +150,12 @@ def require_roles(*allowed_roles: str) -> Callable:
     return dependency
 
 
-__all__ = ["get_db", "get_current_user", "require_roles", "verify_csrf"]
+__all__ = [
+    "get_db",
+    "get_current_user",
+    "optional_refresh_cookie",
+    "require_access_cookie",
+    "require_refresh_cookie",
+    "require_roles",
+    "verify_csrf",
+]

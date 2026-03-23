@@ -40,6 +40,35 @@ LogOnService provides secure authentication primitives for enterprise systems:
 
 ---
 
+## API Cookie Requirements (Team Reference)
+The API uses cookie-based auth. For state-changing routes, CSRF double-submit is required.
+
+| Route | Method | Required Cookies | Required Header | Notes |
+|---|---|---|---|---|
+| `/auth/login` | POST | none | none | Sets `access_token`, `refresh_token`, `csrf_token` |
+| `/auth/login/mfa` | POST | none | none | Sets `access_token`, `refresh_token`, `csrf_token` after MFA verification |
+| `/auth/register` | POST | none | none | Public route |
+| `/auth/refresh` | POST | `refresh_token`, `csrf_token` | `X-CSRF-Token` (must match cookie) | Rotates refresh token pair |
+| `/auth/logout` | POST | `csrf_token` (and optionally `refresh_token`) | `X-CSRF-Token` (must match cookie) | Clears auth cookies even if refresh is missing/invalid |
+| `/auth/logout-all` | POST | `access_token`, `csrf_token` | `X-CSRF-Token` (must match cookie) | Revokes all user sessions |
+| `/users/me` | GET | `access_token` | none | Returns current user |
+| `/users/admin/health` | GET | `access_token` | none | Admin role required (+ MFA claim for admin) |
+| `/users/admin/security-events` | GET | `access_token` | none | Admin observability endpoint for recent audit/security events |
+| `/users/me/sessions` | GET | `access_token`, `refresh_token` | none | Lists active sessions and marks `is_current` from refresh JTI |
+| `/users/me/sessions/{jti}` | DELETE | `access_token`, `csrf_token` | `X-CSRF-Token` (must match cookie) | Revokes one session by JTI (owner only) |
+| `/users/me/sessions` | DELETE | `access_token`, `refresh_token`, `csrf_token` | `X-CSRF-Token` (must match cookie) | Revokes all other sessions, keeps current session |
+| `/users/me/change-password` | POST | `access_token`, `csrf_token` | `X-CSRF-Token` (must match cookie) | Invalidates other sessions and rotates cookies |
+| `/mfa/setup` | POST | `access_token`, `csrf_token` | `X-CSRF-Token` (must match cookie) | Generates TOTP secret |
+| `/mfa/verify` | POST | `access_token`, `csrf_token` | `X-CSRF-Token` (must match cookie) | Enables MFA |
+
+Notes:
+- Swagger now auto-attaches `X-CSRF-Token` from `csrf_token` cookie for `POST/PUT/PATCH/DELETE`.
+- OpenAPI displays cookie/header requirements through route dependencies.
+- Security events are persisted in `audit_logs` and emitted as structured logs (`app.security.events` logger).
+- Optional email alerts can be enabled with `SECURITY_ALERTS_ENABLED=true` + `SECURITY_ALERT_EMAIL`.
+
+---
+
 ## Setup Option 1: Manual (Local Python + Local Services)
 
 ### Prerequisites
@@ -153,3 +182,33 @@ docker compose build web
 # tail web logs
 docker compose logs -f web
 ```
+
+## Frontend Module
+- Frontend lives fully under: `frontend/`
+- Frontend docs: [frontend/README.md](/Users/manishdudi/Desktop/LogOnService/frontend/README.md)
+- Frontend architecture: [ARCHITECTURE.md](/Users/manishdudi/Desktop/LogOnService/frontend/docs/ARCHITECTURE.md)
+
+Quick start:
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+Docker dev:
+```bash
+cd frontend
+docker compose up --build frontend-dev
+```
+
+## CI Pipeline
+- GitHub Actions workflow: [.github/workflows/ci.yml](/Users/manishdudi/Desktop/LogOnService/.github/workflows/ci.yml)
+- Runs on push and pull requests
+- Installs dependencies, verifies Docker, runs `pytest -q app/tests`
+
+## Security Observability
+- `AuditRepository.create_event(...)` now also emits a structured security log entry.
+- Config-driven alerting (email via SMTP) for selected event types:
+  - `SECURITY_ALERTS_ENABLED`
+  - `SECURITY_ALERT_EMAIL`
+  - `SECURITY_ALERT_EVENT_TYPES` (comma-separated)

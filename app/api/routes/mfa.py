@@ -7,6 +7,7 @@ from app.models.user import User
 from app.repositories.audit_repository import AuditRepository
 from app.schemas.mfa import MFASetupResponse, MFAVerifyRequest, MFAVerifyResponse
 from app.services.totp_service import build_provisioning_uri, generate_totp_secret, verify_totp_code
+from app.utils.encryption import EncryptionError, decrypt_text, encrypt_text
 
 
 router = APIRouter(prefix="/mfa", tags=["mfa"])
@@ -21,7 +22,7 @@ async def setup_totp(
 ) -> MFASetupResponse:
     secret = generate_totp_secret()
     provisioning_uri = build_provisioning_uri(secret=secret, email=current_user.email)
-    current_user.totp_secret = secret
+    current_user.totp_secret = encrypt_text(secret)
     current_user.mfa_enabled = False
     await db.commit()
 
@@ -45,7 +46,11 @@ async def verify_totp_setup(
 ) -> MFAVerifyResponse:
     if not current_user.totp_secret:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="MFA setup not initiated")
-    if not verify_totp_code(secret=current_user.totp_secret, code=payload.code):
+    try:
+        decrypted_secret = decrypt_text(current_user.totp_secret)
+    except EncryptionError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid MFA secret state")
+    if not verify_totp_code(secret=decrypted_secret, code=payload.code):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid MFA code")
 
     current_user.mfa_enabled = True

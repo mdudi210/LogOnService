@@ -1,11 +1,10 @@
-from typing import Dict
+from typing import Dict, Optional
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user, verify_csrf
-from app.core.config import settings
+from app.api.deps import get_current_user, optional_refresh_cookie, require_refresh_cookie, verify_csrf
 from app.core.database import get_db
 from app.models.user import User
 from app.repositories.session_repository import SessionRepository
@@ -43,6 +42,7 @@ from app.services.auth_service import (
 )
 from app.repositories.user_repository import UserRepository
 from app.services.totp_service import verify_totp_code
+from app.utils.encryption import EncryptionError, decrypt_text
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -136,7 +136,11 @@ async def login_mfa(
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid MFA token")
     if not user.mfa_enabled or not user.totp_secret:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="MFA is not enabled")
-    if not verify_totp_code(secret=user.totp_secret, code=payload.code):
+    try:
+        decrypted_secret = decrypt_text(user.totp_secret)
+    except EncryptionError:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid MFA secret state")
+    if not verify_totp_code(secret=decrypted_secret, code=payload.code):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid MFA code")
 
     refresh_jti = str(uuid4())
@@ -199,13 +203,10 @@ async def register(
 async def refresh_tokens(
     request: Request,
     response: Response,
+    refresh_token: str = Depends(require_refresh_cookie),
     _: None = Depends(verify_csrf),
     db: AsyncSession = Depends(get_db),
 ) -> RefreshResponse:
-    refresh_token = request.cookies.get(settings.REFRESH_COOKIE_NAME)
-    if not refresh_token:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing refresh token")
-
     try:
         payload = verify_refresh_token(refresh_token)
     except TokenValidationError:
@@ -250,12 +251,11 @@ async def refresh_tokens(
 
 @router.post("/logout", response_model=RefreshResponse)
 async def logout(
-    request: Request,
     response: Response,
+    refresh_token: Optional[str] = Depends(optional_refresh_cookie),
     _: None = Depends(verify_csrf),
     db: AsyncSession = Depends(get_db),
 ) -> RefreshResponse:
-    refresh_token = request.cookies.get(settings.REFRESH_COOKIE_NAME)
     if refresh_token:
         try:
             payload = verify_refresh_token(refresh_token)

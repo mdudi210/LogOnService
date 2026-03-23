@@ -23,6 +23,7 @@ class Settings(BaseSettings):
     REDIS_URL: str
     JWT_SECRET_KEY: str
     JWT_REFRESH_SECRET_KEY: str
+    TOTP_ENCRYPTION_KEY: str = ""
     ALLOWED_CORS_ORIGINS_RAW: str = Field(alias="ALLOWED_CORS_ORIGINS")
 
     # JWT + cookies
@@ -49,6 +50,12 @@ class Settings(BaseSettings):
     SMTP_PASSWORD: str = ""
     SMTP_FROM_EMAIL: str = "noreply@logonservice.local"
     SMTP_STARTTLS: bool = True
+    SECURITY_ALERTS_ENABLED: bool = True
+    SECURITY_ALERT_EMAIL: str = ""
+    SECURITY_ALERT_EVENT_TYPES_RAW: str = Field(
+        default="TOKEN_REUSE_DETECTED,PASSWORD_CHANGED,MFA_ENABLED",
+        alias="SECURITY_ALERT_EVENT_TYPES",
+    )
 
     @property
     def ALLOWED_CORS_ORIGINS(self) -> List[str]:
@@ -79,6 +86,17 @@ class Settings(BaseSettings):
         if len(value) < 32:
             raise ValueError("JWT secrets must be at least 32 characters long")
         return value
+
+    @property
+    def SECURITY_ALERT_EVENT_TYPES(self) -> List[str]:
+        return self._parse_csv(self.SECURITY_ALERT_EVENT_TYPES_RAW)
+
+    @classmethod
+    def _parse_csv(cls, value: str) -> List[str]:
+        text = (value or "").strip()
+        if not text:
+            return []
+        return [item.strip() for item in text.split(",") if item.strip()]
 
 
 settings = Settings()

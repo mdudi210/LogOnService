@@ -66,3 +66,17 @@ class SessionRepository(BaseRepository[Session]):
         )
         await self.db.commit()
         return [jti for jti in result.scalars().all() if jti]
+
+    async def revoke_other_sessions(self, *, user_id, exclude_jti: str) -> List[str]:
+        result = await self.db.execute(
+            update(Session)
+            .where(
+                Session.user_id == user_id,
+                Session.jti != exclude_jti,
+                Session.is_revoked.is_(False),
+            )
+            .values(is_revoked=True, revoked_at=datetime.utcnow())
+            .returning(Session.jti)
+        )
+        await self.db.commit()
+        return [jti for jti in result.scalars().all() if jti]
