@@ -32,11 +32,15 @@ LogOnService provides secure authentication primitives for enterprise systems:
 - Containerized integration tests with `testcontainers`
 
 ### Next Recommended Work
-1. Encrypt `totp_secret` at rest (currently plaintext)
-2. Add CI pipeline (lint, tests, migration checks)
-3. Add observability/security alerting (audit events, replay alerts)
-4. Harden production profile (cookie/domain/TLS defaults, secrets management)
-5. Expand test coverage for negative/security edge cases
+1. Add backend APIs for admin feature configuration (frontend currently uses local placeholders).
+2. Expand CI quality gates (`ruff`, `mypy`, security scans).
+3. Harden production profile (cookie/domain/TLS defaults, secrets management, key rotation runbooks).
+4. Expand test coverage for concurrency and abuse/security edge cases.
+5. Add operational dashboards and alert thresholds for security events.
+
+See complete analyzed status:
+- [COMPLETE_STATUS_2026-03-28.md](/Users/manishdudi/Desktop/LogOnService/docs/COMPLETE_STATUS_2026-03-28.md)
+- [NEXT_IMPLEMENTATION_BACKLOG.md](/Users/manishdudi/Desktop/LogOnService/docs/NEXT_IMPLEMENTATION_BACKLOG.md)
 
 ---
 
