@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 
 from sqlalchemy import delete, select, update
@@ -36,6 +36,9 @@ class SessionRepository(BaseRepository[Session]):
         session_expires_at: datetime,
         device_id=None,
     ) -> Session:
+        if session_expires_at.tzinfo is not None:
+            session_expires_at = session_expires_at.astimezone(timezone.utc).replace(tzinfo=None)
+
         session = Session(
             user_id=user_id,
             device_id=device_id,
@@ -60,6 +63,20 @@ class SessionRepository(BaseRepository[Session]):
     async def delete_all_user_sessions(self, user_id) -> List[str]:
         result = await self.db.execute(
             delete(Session).where(Session.user_id == user_id).returning(Session.jti)
+        )
+        await self.db.commit()
+        return [jti for jti in result.scalars().all() if jti]
+
+    async def revoke_other_sessions(self, *, user_id, exclude_jti: str) -> List[str]:
+        result = await self.db.execute(
+            update(Session)
+            .where(
+                Session.user_id == user_id,
+                Session.jti != exclude_jti,
+                Session.is_revoked.is_(False),
+            )
+            .values(is_revoked=True, revoked_at=datetime.utcnow())
+            .returning(Session.jti)
         )
         await self.db.commit()
         return [jti for jti in result.scalars().all() if jti]

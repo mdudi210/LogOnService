@@ -7,6 +7,7 @@ Create Date: 2026-03-02 11:40:00
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy import inspect
 
 
 # revision identifiers, used by Alembic.
@@ -17,8 +18,16 @@ depends_on = None
 
 
 def upgrade() -> None:
-    op.add_column("user_credentials", sa.Column("password_salt", sa.String(length=255), nullable=True))
+    bind = op.get_bind()
+    inspector = inspect(bind)
+    columns = {column["name"] for column in inspector.get_columns("user_credentials")}
+    if "password_salt" not in columns:
+        op.add_column("user_credentials", sa.Column("password_salt", sa.String(length=255), nullable=True))
 
 
 def downgrade() -> None:
-    op.drop_column("user_credentials", "password_salt")
+    bind = op.get_bind()
+    inspector = inspect(bind)
+    columns = {column["name"] for column in inspector.get_columns("user_credentials")}
+    if "password_salt" in columns:
+        op.drop_column("user_credentials", "password_salt")

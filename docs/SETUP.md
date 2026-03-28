@@ -49,9 +49,24 @@ source .venv/bin/activate
 uvicorn app.main:app --reload
 ```
 
-## 7) Verify
+## 7) Run Frontend (Optional)
+```bash
+cd /Users/manishdudi/Desktop/LogOnService/frontend
+cp .env.example .env
+npm install
+npm run dev
+```
+
+Containerized frontend dev:
+```bash
+cd /Users/manishdudi/Desktop/LogOnService/frontend
+docker compose up --build frontend-dev
+```
+
+## 8) Verify
 - Health: `GET http://127.0.0.1:8000/health`
 - Swagger: `http://127.0.0.1:8000/docs`
+- Frontend: `http://localhost:3000`
 
 ## Common Commands
 ```bash
@@ -67,3 +82,9 @@ docker compose --env-file .env -f docker-compose.yaml exec -T postgres_db \
 cd ../Redis
 docker compose --env-file .env -f docker-compose.yaml exec -T redis_cache redis-cli ping
 ```
+
+## Hostname Consistency Note
+For cookie-based auth, avoid mixing hostnames across frontend and backend.
+- Good: `localhost:3000` + `localhost:8000`
+- Good: `127.0.0.1:3000` + `127.0.0.1:8000`
+- Avoid: `localhost` frontend with `127.0.0.1` backend (or vice-versa)

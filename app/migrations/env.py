@@ -5,6 +5,7 @@ from logging.config import fileConfig
 import os
 
 from alembic import context
+from dotenv import load_dotenv
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config
 
@@ -16,6 +17,9 @@ config = context.config
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
+
+# Keep Alembic behavior aligned with app runtime config.
+load_dotenv()
 
 
 def get_database_url() -> str:

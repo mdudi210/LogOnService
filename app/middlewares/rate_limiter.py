@@ -7,7 +7,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.responses import JSONResponse
 
 from app.core.config import settings
-from app.core.redis import RedisError, get_redis_client
+from app.core.redis import RedisError, close_redis_client, get_redis_client
 
 
 class RedisRateLimiterMiddleware(BaseHTTPMiddleware):
@@ -32,12 +32,8 @@ class RedisRateLimiterMiddleware(BaseHTTPMiddleware):
         window = int(time.time()) // self.window_seconds
         key = f"{self.key_prefix}:{client_host}:{window}"
 
-        try:
-            redis_conn = get_redis_client()
-            current = await redis_conn.incr(key)
-            if current == 1:
-                await redis_conn.expire(key, self.window_seconds)
-        except RedisError:
+        current = await self._increment_window_counter(key)
+        if current is None:
             # Fail-open strategy to preserve availability if Redis is unavailable.
             return await call_next(request)
 
@@ -53,3 +49,19 @@ class RedisRateLimiterMiddleware(BaseHTTPMiddleware):
         response.headers["X-RateLimit-Limit"] = str(self.max_requests)
         response.headers["X-RateLimit-Remaining"] = str(max(self.max_requests - current, 0))
         return response
+
+    async def _increment_window_counter(self, key: str) -> Optional[int]:
+        """Increment rate-limit counter with one recovery attempt for stale async clients."""
+        for attempt in range(2):
+            try:
+                redis_conn = get_redis_client()
+                current = await redis_conn.incr(key)
+                if current == 1:
+                    await redis_conn.expire(key, self.window_seconds)
+                return int(current)
+            except (RedisError, RuntimeError):
+                if attempt == 0:
+                    await close_redis_client()
+                    continue
+                return None
+        return None

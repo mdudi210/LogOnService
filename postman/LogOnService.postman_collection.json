@@ -1,0 +1,481 @@
+{
+  "info": {
+    "_postman_id": "7df391a8-4e5c-4f19-a8d1-8bbcf2a56f8f",
+    "name": "LogOnService API",
+    "description": "Cookie-based auth flow with CSRF handling for LogOnService.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const method = (pm.request.method || '').toUpperCase();",
+          "const mutating = ['POST','PUT','PATCH','DELETE'].includes(method);",
+          "if (mutating) {",
+          "  const csrf = pm.cookies.get('csrf_token') || pm.environment.get('csrf_token');",
+          "  if (csrf) {",
+          "    pm.request.headers.upsert({ key: 'X-CSRF-Token', value: csrf });",
+          "  }",
+          "}"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const setCookies = pm.response.headers.all().filter(h => h.key.toLowerCase() === 'set-cookie').map(h => h.value);",
+          "for (const raw of setCookies) {",
+          "  const match = raw.match(/^([^=]+)=([^;]*)/);",
+          "  if (!match) continue;",
+          "  const key = match[1];",
+          "  const value = match[2];",
+          "  if (key === 'csrf_token') pm.environment.set('csrf_token', value);",
+          "  if (key === 'access_token') pm.environment.set('access_token', value);",
+          "  if (key === 'refresh_token') pm.environment.set('refresh_token', value);",
+          "}"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "00 Health",
+      "item": [
+        {
+          "name": "GET /health",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "health"
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /auth/health",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/auth/health",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "health"
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /users/health",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/users/health",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "users",
+                "health"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "01 Auth",
+      "item": [
+        {
+          "name": "POST /auth/register",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{new_user_email}}\",\n  \"username\": \"{{new_user_username}}\",\n  \"password\": \"{{new_user_password}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/register",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST /auth/login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let data = {};",
+                  "try { data = pm.response.json(); } catch (e) {}",
+                  "if (data.mfa_token) pm.environment.set('mfa_token', data.mfa_token);",
+                  "if (data.user && data.user.id) pm.environment.set('current_user_id', data.user.id);",
+                  "pm.test('Login request executed', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 401, 403]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email_or_username\": \"{{login_identifier}}\",\n  \"password\": \"{{login_password}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST /auth/login/mfa",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mfa_token\": \"{{mfa_token}}\",\n  \"code\": \"{{totp_code}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/auth/login/mfa",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "login",
+                "mfa"
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST /auth/refresh",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/auth/refresh",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "refresh"
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST /auth/logout",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/auth/logout",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "logout"
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST /auth/logout-all",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/auth/logout-all",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "logout-all"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "02 Users",
+      "item": [
+        {
+          "name": "GET /users/me",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/users/me",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "users",
+                "me"
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST /users/me/change-password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"old_password\": \"{{login_password}}\",\n  \"new_password\": \"{{new_password}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/users/me/change-password",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "users",
+                "me",
+                "change-password"
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /users/me/sessions",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let data = {};",
+                  "try { data = pm.response.json(); } catch (e) {}",
+                  "if (Array.isArray(data.sessions)) {",
+                  "  const target = data.sessions.find(s => !s.is_current) || data.sessions[0];",
+                  "  if (target && target.jti) pm.environment.set('session_jti', target.jti);",
+                  "}",
+                  "pm.test('Sessions request executed', function () {",
+                  "  pm.expect(pm.response.code).to.be.oneOf([200, 401]);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/users/me/sessions",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "users",
+                "me",
+                "sessions"
+              ]
+            }
+          }
+        },
+        {
+          "name": "DELETE /users/me/sessions/:jti",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{base_url}}/users/me/sessions/{{session_jti}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "users",
+                "me",
+                "sessions",
+                "{{session_jti}}"
+              ]
+            }
+          }
+        },
+        {
+          "name": "DELETE /users/me/sessions (revoke others)",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{base_url}}/users/me/sessions",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "users",
+                "me",
+                "sessions"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "03 MFA",
+      "item": [
+        {
+          "name": "POST /mfa/setup",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "let data = {};",
+                  "try { data = pm.response.json(); } catch (e) {}",
+                  "if (data.secret) pm.environment.set('totp_secret', data.secret);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/mfa/setup",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "mfa",
+                "setup"
+              ]
+            }
+          }
+        },
+        {
+          "name": "POST /mfa/verify",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"{{totp_code}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/mfa/verify",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "mfa",
+                "verify"
+              ]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "04 Admin",
+      "item": [
+        {
+          "name": "GET /users/admin/health",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/users/admin/health",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "users",
+                "admin",
+                "health"
+              ]
+            }
+          }
+        },
+        {
+          "name": "GET /users/admin/security-events",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/users/admin/security-events?limit=50",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "users",
+                "admin",
+                "security-events"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                },
+                {
+                  "key": "event_type",
+                  "value": ""
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8000"
+    }
+  ]
+}

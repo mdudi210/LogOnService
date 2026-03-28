@@ -20,14 +20,19 @@
   - `GET /users/me`
   - `GET /users/admin/health` (admin-only)
 - Test suite covering login, token flow, logout, protected routes, and authorization boundaries.
+- TOTP secret encryption-at-rest with legacy plaintext compatibility upgrade path.
+- Runtime audit middleware wiring for auth-sensitive mutating endpoints (fail-open).
+- OAuth account linking/login endpoints and Google authorization-code callback flow.
+- Adaptive risk-scoring engine + high-risk login block policy (when MFA is not enabled).
+- Security alerting pipeline with optional email/webhook delivery.
+- Admin security event observability endpoints (JSON + CSV export).
+- Postman runner smoke collections for auth and admin-security workflows.
 
 ## Seed Users (Dev Only)
 - Admin: `admin@test.local` / `Admin@12345`
 - User: `user@test.local` / `User@12345`
 
 ## Known Placeholders (Not Yet Implemented)
-- Redis-backed refresh token persistence and reuse detection.
-- Session table integration with token lifecycle.
-- MFA challenge/enrollment implementation.
-- Encryption provider implementation (`app/utils/encryption.py`).
-- Production observability and audit middleware runtime wiring.
+- Additional OAuth providers (GitHub/enterprise OIDC beyond Google flow).
+- SIEM-native integrations and alert routing playbooks.
+- Session/device self-service management endpoints for end users/admins.

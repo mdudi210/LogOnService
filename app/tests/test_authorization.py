@@ -28,7 +28,7 @@ def test_admin_route_allows_admin_role(monkeypatch) -> None:
         fake_get_by_id_with_relationships,
     )
 
-    access = create_access_token(user_id=str(user.id), role="admin")
+    access = create_access_token(user_id=str(user.id), role="admin", mfa_authenticated=True)
 
     with TestClient(app) as client:
         client.cookies.set("access_token", access)
@@ -57,6 +57,27 @@ def test_admin_route_forbidden_for_user_role(monkeypatch) -> None:
 
     assert response.status_code == 403
     assert response.json()["detail"] == "Insufficient permissions"
+
+
+def test_admin_route_requires_mfa_claim(monkeypatch) -> None:
+    user = DummyUser(role="admin")
+
+    async def fake_get_by_id_with_relationships(self, user_id):
+        return user
+
+    monkeypatch.setattr(
+        "app.repositories.user_repository.UserRepository.get_by_id_with_relationships",
+        fake_get_by_id_with_relationships,
+    )
+
+    access = create_access_token(user_id=str(user.id), role="admin", mfa_authenticated=False)
+
+    with TestClient(app) as client:
+        client.cookies.set("access_token", access)
+        response = client.get("/users/admin/health")
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "MFA is required for admin access"
 
 
 def test_admin_route_missing_access_cookie() -> None:

@@ -9,3 +9,4 @@ SUPPORTED_MFA_TYPES = {"totp", "email", "webauthn"}
 
 ACCESS_TOKEN_TYPE = "access"
 REFRESH_TOKEN_TYPE = "refresh"
+MFA_TOKEN_TYPE = "mfa"

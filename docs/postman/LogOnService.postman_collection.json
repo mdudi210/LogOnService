@@ -1,0 +1,769 @@
+{
+  "info": {
+    "name": "LogOnService API",
+    "_postman_id": "9d0f4f11-24ae-4e79-9a2d-3ef66a14ce74",
+    "description": "Testing collection for LogOnService flows. Non-runtime asset only.\n\nRecommended run order:\n1) Auth > Register (optional)\n2) Auth > Login\n3) Auth > Refresh\n4) Users > Me\n5) Users > Change Password (optional)\n6) Admin > Security Events / Export (admin token with MFA claim)\n\nCSRF is handled automatically by pre-request scripts that copy csrf_token cookie into X-CSRF-Token.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Register",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{registerEmail}}\",\n  \"username\": \"{{registerUsername}}\",\n  \"password\": \"{{registerPassword}}\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/register"
+          }
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const data = pm.response.json();",
+                  "  if (data.mfa_token) pm.collectionVariables.set('mfaToken', data.mfa_token);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email_or_username\": \"{{loginId}}\",\n  \"password\": \"{{loginPassword}}\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/login"
+          }
+        },
+        {
+          "name": "Login MFA",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"mfa_token\": \"{{mfaToken}}\",\n  \"code\": \"{{mfaCode}}\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/login/mfa"
+          }
+        },
+        {
+          "name": "Refresh",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const csrf = pm.cookies.get('csrf_token');",
+                  "if (csrf) pm.collectionVariables.set('csrfToken', csrf);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/refresh"
+          }
+        },
+        {
+          "name": "Logout",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const csrf = pm.cookies.get('csrf_token');",
+                  "if (csrf) pm.collectionVariables.set('csrfToken', csrf);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/logout"
+          }
+        },
+        {
+          "name": "Logout All",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const csrf = pm.cookies.get('csrf_token');",
+                  "if (csrf) pm.collectionVariables.set('csrfToken', csrf);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/logout-all"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Users",
+      "item": [
+        {
+          "name": "Me",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/users/me"
+          }
+        },
+        {
+          "name": "Change Password",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const csrf = pm.cookies.get('csrf_token');",
+                  "if (csrf) pm.collectionVariables.set('csrfToken', csrf);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"old_password\": \"{{loginPassword}}\",\n  \"new_password\": \"{{newPassword}}\"\n}"
+            },
+            "url": "{{baseUrl}}/users/me/change-password"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Admin",
+      "item": [
+        {
+          "name": "Admin Health",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/users/admin/health"
+          }
+        },
+        {
+          "name": "Security Events",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/users/admin/security-events?limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "admin",
+                "security-events"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Security Events Export CSV",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/users/admin/security-events/export?limit=500"
+          }
+        }
+      ]
+    },
+    {
+      "name": "MFA",
+      "item": [
+        {
+          "name": "MFA Setup",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const csrf = pm.cookies.get('csrf_token');",
+                  "if (csrf) pm.collectionVariables.set('csrfToken', csrf);"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const data = pm.response.json();",
+                  "  if (data.secret) pm.collectionVariables.set('totpSecret', data.secret);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/mfa/setup"
+          }
+        },
+        {
+          "name": "MFA Verify",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const csrf = pm.cookies.get('csrf_token');",
+                  "if (csrf) pm.collectionVariables.set('csrfToken', csrf);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"{{mfaCode}}\"\n}"
+            },
+            "url": "{{baseUrl}}/mfa/verify"
+          }
+        }
+      ]
+    },
+    {
+      "name": "OAuth",
+      "item": [
+        {
+          "name": "OAuth Providers",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/auth/oauth/providers"
+          }
+        },
+        {
+          "name": "Google Authorize URL",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const data = pm.response.json();",
+                  "  if (data.state) pm.collectionVariables.set('oauthState', data.state);",
+                  "  if (data.authorization_url) pm.collectionVariables.set('googleAuthUrl', data.authorization_url);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/auth/oauth/google/authorize"
+          }
+        },
+        {
+          "name": "Google Callback (manual code)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/auth/oauth/google/callback?code={{googleCode}}&state={{oauthState}}"
+          }
+        },
+        {
+          "name": "OAuth Link (manual token payload)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "const csrf = pm.cookies.get('csrf_token');",
+                  "if (csrf) pm.collectionVariables.set('csrfToken', csrf);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"provider\": \"google\",\n  \"provider_user_id\": \"{{oauthProviderUserId}}\",\n  \"access_token\": \"{{oauthAccessToken}}\",\n  \"refresh_token\": \"{{oauthRefreshToken}}\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/oauth/link"
+          }
+        },
+        {
+          "name": "OAuth Login (linked identity)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"provider\": \"google\",\n  \"provider_user_id\": \"{{oauthProviderUserId}}\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/oauth/login"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Runner Smoke",
+      "description": "One-click smoke flow for Postman Runner. Executes auth lifecycle with assertions.",
+      "item": [
+        {
+          "name": "01 Health",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Health status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "const body = pm.response.json();",
+                  "pm.test('Health payload has status ok', function () {",
+                  "  pm.expect(body.status).to.eql('ok');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/health"
+          }
+        },
+        {
+          "name": "02 Auth Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Login status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "const data = pm.response.json();",
+                  "pm.test('Login returns user or mfa challenge', function () {",
+                  "  pm.expect(data.message).to.be.a('string');",
+                  "});",
+                  "if (data.mfa_token) pm.collectionVariables.set('mfaToken', data.mfa_token);",
+                  "const setCookie = pm.response.headers.get('set-cookie') || '';",
+                  "pm.test('Login sets auth cookies when MFA not required', function () {",
+                  "  if (!data.mfa_required) {",
+                  "    pm.expect(setCookie).to.include('access_token=');",
+                  "    pm.expect(setCookie).to.include('refresh_token=');",
+                  "  }",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email_or_username\": \"{{loginId}}\",\n  \"password\": \"{{loginPassword}}\"\n}"
+            },
+            "url": "{{baseUrl}}/auth/login"
+          }
+        },
+        {
+          "name": "03 Auth Refresh",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const csrf = pm.cookies.get('csrf_token');",
+                  "if (csrf) pm.collectionVariables.set('csrfToken', csrf);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Refresh status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "const body = pm.response.json();",
+                  "pm.test('Refresh response message present', function () {",
+                  "  pm.expect(body.message).to.eql('Token refresh successful');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/refresh"
+          }
+        },
+        {
+          "name": "04 Users Me",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Users me status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "const data = pm.response.json();",
+                  "pm.test('Users me has identity fields', function () {",
+                  "  pm.expect(data).to.have.property('id');",
+                  "  pm.expect(data).to.have.property('email');",
+                  "  pm.expect(data).to.have.property('role');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/users/me"
+          }
+        },
+        {
+          "name": "05 Auth Logout",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const csrf = pm.cookies.get('csrf_token');",
+                  "if (csrf) pm.collectionVariables.set('csrfToken', csrf);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Logout status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "const body = pm.response.json();",
+                  "pm.test('Logout response message present', function () {",
+                  "  pm.expect(body.message).to.eql('Logout successful');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-CSRF-Token",
+                "value": "{{csrfToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/logout"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Runner Admin Security",
+      "description": "One-click admin/security smoke flow. Requires admin access token cookie with MFA claim.",
+      "item": [
+        {
+          "name": "01 Admin Health",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Admin health status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "const body = pm.response.json();",
+                  "pm.test('Admin health scope present', function () {",
+                  "  pm.expect(body.scope).to.eql('admin');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/users/admin/health"
+          }
+        },
+        {
+          "name": "02 Security Events JSON",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Security events status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "const body = pm.response.json();",
+                  "pm.test('Security events has count and events array', function () {",
+                  "  pm.expect(body).to.have.property('count');",
+                  "  pm.expect(body).to.have.property('events');",
+                  "  pm.expect(body.events).to.be.an('array');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/users/admin/security-events?limit=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "admin",
+                "security-events"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "50"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "03 Security Events Export CSV",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Security events CSV status is 200', function () {",
+                  "  pm.response.to.have.status(200);",
+                  "});",
+                  "pm.test('CSV content-type is present', function () {",
+                  "  const ctype = (pm.response.headers.get('Content-Type') || '').toLowerCase();",
+                  "  pm.expect(ctype).to.include('text/csv');",
+                  "});",
+                  "pm.test('CSV includes header columns', function () {",
+                  "  const text = pm.response.text();",
+                  "  pm.expect(text).to.include('event_id,created_at,user_id,alert_type,severity,ip_address,user_agent,metadata_json');",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{baseUrl}}/users/admin/security-events/export?limit=500",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "users",
+                "admin",
+                "security-events",
+                "export"
+              ],
+              "query": [
+                {
+                  "key": "limit",
+                  "value": "500"
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://127.0.0.1:8000"
+    },
+    {
+      "key": "loginId",
+      "value": "admin@test.local"
+    },
+    {
+      "key": "loginPassword",
+      "value": "Admin@12345"
+    },
+    {
+      "key": "registerEmail",
+      "value": "postman_user@test.local"
+    },
+    {
+      "key": "registerUsername",
+      "value": "postman_user"
+    },
+    {
+      "key": "registerPassword",
+      "value": "Postman@12345"
+    },
+    {
+      "key": "newPassword",
+      "value": "Postman@123456"
+    },
+    {
+      "key": "csrfToken",
+      "value": ""
+    },
+    {
+      "key": "mfaToken",
+      "value": ""
+    },
+    {
+      "key": "mfaCode",
+      "value": "123456"
+    },
+    {
+      "key": "oauthState",
+      "value": ""
+    },
+    {
+      "key": "googleCode",
+      "value": ""
+    },
+    {
+      "key": "googleAuthUrl",
+      "value": ""
+    },
+    {
+      "key": "oauthProviderUserId",
+      "value": "google-user-123"
+    },
+    {
+      "key": "oauthAccessToken",
+      "value": ""
+    },
+    {
+      "key": "oauthRefreshToken",
+      "value": ""
+    }
+  ]
+}

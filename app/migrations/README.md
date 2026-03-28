@@ -25,3 +25,6 @@ alembic revision --autogenerate -m "describe change"
 ## Migration Notes
 - `20260227_0001`: initial auth schema
 - `20260302_0002`: adds `password_salt` to `user_credentials`
+- `20260305_0003`: adds `jti` to `sessions`
+- `20260305_0004`: adds `user_agent` to `audit_logs`
+- `20260305_0005`: adds `mfa_enabled` and `totp_secret` to `users`
