@@ -7,7 +7,6 @@
 
 ## Token Security
 - JWT access and refresh tokens with independent secrets.
-- MFA token type supported for step-up login.
 - Type claim enforcement (`access` vs `refresh`).
 - Expiration enforced via `exp`.
 - Tokens delivered via HttpOnly cookies only.
@@ -18,41 +17,29 @@ Configurable via env:
 - `AUTH_COOKIE_SAMESITE`
 - `ACCESS_COOKIE_NAME`
 - `REFRESH_COOKIE_NAME`
-- `CSRF_COOKIE_NAME`
-- `CSRF_HEADER_NAME`
-
-## CSRF Protection
-- Double-submit cookie pattern.
-- Mutating requests require matching `csrf_token` cookie and `X-CSRF-Token` header.
 
 ## Authentication Guardrails
 - DB user must exist.
 - User must be active and not soft-deleted.
 - Token role must match DB role to reduce stale privilege risk.
+- Adaptive risk scoring on login (device novelty + network + user-agent heuristics).
+- High-risk login attempts are blocked for users without MFA enabled.
 
 ## Authorization Guardrails
 - `require_roles(...)` dependency validates endpoint-level role access.
-- Admin role paths also require `mfa_authenticated=true` in access token.
+- Admin routes enforce MFA-authenticated access token claims.
+- Security event observability endpoint: `GET /users/admin/security-events`.
 
-## Session Security
-- Refresh token `jti` persisted in Redis with metadata.
-- Rotation consumes old `jti` and issues a new one.
-- Reuse detection triggers user-wide session/token revocation.
-- Session lifecycle tracked in DB (`sessions` table) and Redis.
+## Alerting Pipeline
+- Security alerts are stored as `SECURITY_ALERT` records in `audit_logs`.
+- Optional email notifications via `ALERT_EMAIL_TO`.
+- Optional webhook notifications via `ALERT_WEBHOOK_URL`.
+- Webhook templates support Slack and Discord payloads (`ALERT_WEBHOOK_FORMAT=auto|slack|discord`).
+- Alert severity threshold controlled by `ALERT_MIN_SEVERITY` (`low|medium|high|critical`).
 
-## Audit & Observability
-- Security-relevant events persisted in `audit_logs`.
-- Structured security event logs emitted via `app.security.events` logger.
-- Optional SMTP alerts for selected event types:
-  - `SECURITY_ALERTS_ENABLED`
-  - `SECURITY_ALERT_EMAIL`
-  - `SECURITY_ALERT_EVENT_TYPES`
-
-## Sensitive Data Protection
-- `totp_secret` encrypted at rest using application encryption utility.
-
-## Remaining Production Hardening
+## Required Production Hardening
 - Replace default JWT keys with long random secrets managed by a secrets manager.
 - Set `AUTH_COOKIE_SECURE=true` in HTTPS environments.
-- Formalize key-rotation runbooks.
-- Add security analytics dashboards and escalations.
+- Configure CSRF header handling in frontend clients.
+- Set dedicated `TOTP_ENCRYPTION_KEY` (not shared with JWT keys).
+- Route alert webhooks to SIEM/on-call tooling.

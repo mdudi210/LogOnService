@@ -27,49 +27,22 @@ LogOnService provides secure authentication primitives for enterprise systems:
 - CSRF double-submit-cookie protection for mutating endpoints
 - Registration and password-change flows
 - TOTP setup/verify and two-step login (`/auth/login` + `/auth/login/mfa`)
+- TOTP secret encryption-at-rest (`totp_secret`)
 - RBAC with admin MFA-claim enforcement
+- Adaptive risk-scoring on login + high-risk blocking for users without MFA
+- OAuth account link/login + Google authorization-code callback flow
+- Security alerting pipeline (audit + optional email/webhook with Slack/Discord templates)
+- Admin security observability APIs (`/users/admin/security-events`, CSV export)
 - Dockerized local stack (`web`, `db`, `redis`)
 - Containerized integration tests with `testcontainers`
+- CI pipeline with tests/migration checks + quality/security jobs
 
 ### Next Recommended Work
-1. Add backend APIs for admin feature configuration (frontend currently uses local placeholders).
-2. Expand CI quality gates (`ruff`, `mypy`, security scans).
-3. Harden production profile (cookie/domain/TLS defaults, secrets management, key rotation runbooks).
-4. Expand test coverage for concurrency and abuse/security edge cases.
-5. Add operational dashboards and alert thresholds for security events.
-
-See complete analyzed status:
-- [COMPLETE_STATUS_2026-03-28.md](/Users/manishdudi/Desktop/LogOnService/docs/COMPLETE_STATUS_2026-03-28.md)
-- [NEXT_IMPLEMENTATION_BACKLOG.md](/Users/manishdudi/Desktop/LogOnService/docs/NEXT_IMPLEMENTATION_BACKLOG.md)
-
----
-
-## API Cookie Requirements (Team Reference)
-The API uses cookie-based auth. For state-changing routes, CSRF double-submit is required.
-
-| Route | Method | Required Cookies | Required Header | Notes |
-|---|---|---|---|---|
-| `/auth/login` | POST | none | none | Sets `access_token`, `refresh_token`, `csrf_token` |
-| `/auth/login/mfa` | POST | none | none | Sets `access_token`, `refresh_token`, `csrf_token` after MFA verification |
-| `/auth/register` | POST | none | none | Public route |
-| `/auth/refresh` | POST | `refresh_token`, `csrf_token` | `X-CSRF-Token` (must match cookie) | Rotates refresh token pair |
-| `/auth/logout` | POST | `csrf_token` (and optionally `refresh_token`) | `X-CSRF-Token` (must match cookie) | Clears auth cookies even if refresh is missing/invalid |
-| `/auth/logout-all` | POST | `access_token`, `csrf_token` | `X-CSRF-Token` (must match cookie) | Revokes all user sessions |
-| `/users/me` | GET | `access_token` | none | Returns current user |
-| `/users/admin/health` | GET | `access_token` | none | Admin role required (+ MFA claim for admin) |
-| `/users/admin/security-events` | GET | `access_token` | none | Admin observability endpoint for recent audit/security events |
-| `/users/me/sessions` | GET | `access_token`, `refresh_token` | none | Lists active sessions and marks `is_current` from refresh JTI |
-| `/users/me/sessions/{jti}` | DELETE | `access_token`, `csrf_token` | `X-CSRF-Token` (must match cookie) | Revokes one session by JTI (owner only) |
-| `/users/me/sessions` | DELETE | `access_token`, `refresh_token`, `csrf_token` | `X-CSRF-Token` (must match cookie) | Revokes all other sessions, keeps current session |
-| `/users/me/change-password` | POST | `access_token`, `csrf_token` | `X-CSRF-Token` (must match cookie) | Invalidates other sessions and rotates cookies |
-| `/mfa/setup` | POST | `access_token`, `csrf_token` | `X-CSRF-Token` (must match cookie) | Generates TOTP secret |
-| `/mfa/verify` | POST | `access_token`, `csrf_token` | `X-CSRF-Token` (must match cookie) | Enables MFA |
-
-Notes:
-- Swagger now auto-attaches `X-CSRF-Token` from `csrf_token` cookie for `POST/PUT/PATCH/DELETE`.
-- OpenAPI displays cookie/header requirements through route dependencies.
-- Security events are persisted in `audit_logs` and emitted as structured logs (`app.security.events` logger).
-- Optional email alerts can be enabled with `SECURITY_ALERTS_ENABLED=true` + `SECURITY_ALERT_EMAIL`.
+1. Add provider-specific OAuth flows beyond Google callback (GitHub, enterprise IdPs)
+2. Add session/device management APIs (list/revoke by device/session)
+3. Route alerts to SIEM/on-call tooling and define incident SLAs
+4. Add stricter CI gates for mypy/bandit/pip-audit once baseline debt is reduced
+5. Expand negative-path and abuse-case security regression tests
 
 ---
 
@@ -127,6 +100,7 @@ python -m pytest -q app/tests
 ```bash
 cp .env.example .env
 ```
+If host port `6379` is already in use, set `REDIS_HOST_PORT=6380` (or any free port) in `.env`.
 
 ### 2. Build and start stack
 ```bash
@@ -187,32 +161,9 @@ docker compose build web
 docker compose logs -f web
 ```
 
-## Frontend Module
-- Frontend lives fully under: `frontend/`
-- Frontend docs: [frontend/README.md](/Users/manishdudi/Desktop/LogOnService/frontend/README.md)
-- Frontend architecture: [ARCHITECTURE.md](/Users/manishdudi/Desktop/LogOnService/frontend/docs/ARCHITECTURE.md)
-
-Quick start:
-```bash
-cd frontend
-npm install
-npm run dev
-```
-
-Docker dev:
-```bash
-cd frontend
-docker compose up --build frontend-dev
-```
-
-## CI Pipeline
-- GitHub Actions workflow: [.github/workflows/ci.yml](/Users/manishdudi/Desktop/LogOnService/.github/workflows/ci.yml)
-- Runs on push and pull requests
-- Installs dependencies, verifies Docker, runs `pytest -q app/tests`
-
-## Security Observability
-- `AuditRepository.create_event(...)` now also emits a structured security log entry.
-- Config-driven alerting (email via SMTP) for selected event types:
-  - `SECURITY_ALERTS_ENABLED`
-  - `SECURITY_ALERT_EMAIL`
-  - `SECURITY_ALERT_EVENT_TYPES` (comma-separated)
+## Postman Smoke Collections
+- Collection: [docs/postman/LogOnService.postman_collection.json](/Users/manishdudi/Desktop/LogOnService/docs/postman/LogOnService.postman_collection.json)
+- Environment: [docs/postman/LogOnService.local.postman_environment.json](/Users/manishdudi/Desktop/LogOnService/docs/postman/LogOnService.local.postman_environment.json)
+- Includes:
+  - `Runner Smoke` (auth lifecycle)
+  - `Runner Admin Security` (admin health + security events JSON/CSV assertions)

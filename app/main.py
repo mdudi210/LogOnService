@@ -1,13 +1,14 @@
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
-from fastapi.openapi.docs import get_swagger_ui_html
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.openapi.docs import get_swagger_ui_html, get_swagger_ui_oauth2_redirect_html
 from fastapi.responses import HTMLResponse
 
 from app.api.routes import auth_router, mfa_router, users_router
 from app.core.config import settings
 from app.core.redis import close_redis_client
+from app.middlewares.audit_middleware import AuditMiddleware
 from app.middlewares.rate_limiter import RedisRateLimiterMiddleware
 
 
@@ -26,6 +27,7 @@ def create_app() -> FastAPI:
         description="Authentication and authorization service",
         lifespan=lifespan,
         docs_url=None,
+        swagger_ui_oauth2_redirect_url="/docs/oauth2-redirect",
     )
 
     app.add_middleware(
@@ -40,52 +42,61 @@ def create_app() -> FastAPI:
             settings.CSRF_HEADER_NAME,
         ],
     )
+    app.add_middleware(AuditMiddleware)
     app.add_middleware(RedisRateLimiterMiddleware)
 
     @app.get("/docs", include_in_schema=False)
-    async def custom_swagger_ui_html() -> HTMLResponse:
-        html = get_swagger_ui_html(
+    async def custom_swagger_ui() -> HTMLResponse:
+        swagger = get_swagger_ui_html(
             openapi_url=app.openapi_url,
             title=f"{app.title} - Swagger UI",
-            swagger_ui_parameters={
-                "persistAuthorization": True,
-                "displayRequestDuration": True,
-            },
+            oauth2_redirect_url=app.swagger_ui_oauth2_redirect_url,
         )
-        csrf_injector = f"""
+        body = swagger.body.decode("utf-8")
+        auto_csrf_script = """
 <script>
-window.addEventListener("load", function () {{
-  if (!window.ui) return;
-  window.ui.getConfigs().requestInterceptor = function (req) {{
-    const method = (req.method || "").toUpperCase();
-    if (!["POST", "PUT", "PATCH", "DELETE"].includes(method)) {{
-      return req;
-    }}
-    const csrfCookieName = "{settings.CSRF_COOKIE_NAME}";
-    const csrfHeaderName = "{settings.CSRF_HEADER_NAME}";
-    const cookie = document.cookie
-      .split("; ")
-      .find((row) => row.startsWith(csrfCookieName + "="));
-    if (cookie) {{
-      const csrfValue = decodeURIComponent(cookie.split("=")[1] || "");
-      if (csrfValue) {{
-        req.headers = req.headers || {{}};
-        req.headers[csrfHeaderName] = csrfValue;
-      }}
-    }}
-    return req;
-  }};
-}});
+function readCookie(name) {
+  const escaped = name.replace(/[-\\/\\\\^$*+?.()|[\\]{}]/g, "\\\\$&");
+  const match = document.cookie.match(new RegExp('(?:^|; )' + escaped + '=([^;]*)'));
+  return match ? decodeURIComponent(match[1]) : null;
+}
+
+(function () {
+  const originalFetch = window.fetch.bind(window);
+  window.fetch = function(input, init) {
+    init = init || {};
+    try {
+      const method = String(init.method || "GET").toUpperCase();
+      if (["POST", "PUT", "PATCH", "DELETE"].includes(method)) {
+        const csrf = readCookie("csrf_token");
+        if (csrf) {
+          const headers = new Headers(init.headers || {});
+          if (!headers.has("X-CSRF-Token")) {
+            headers.set("X-CSRF-Token", csrf);
+          }
+          init.headers = headers;
+        }
+      }
+      if (typeof init.credentials === "undefined") {
+        init.credentials = "same-origin";
+      }
+    } catch (_) {}
+    return originalFetch(input, init);
+  };
+})();
 </script>
 """
-        content = html.body.decode("utf-8").replace("</body>", f"{csrf_injector}</body>")
-        headers = dict(html.headers)
-        headers.pop("content-length", None)
-        return HTMLResponse(
-            content=content,
-            status_code=html.status_code,
-            headers=headers,
-        )
+        body = body.replace("</body>", auto_csrf_script + "\n</body>")
+        response_headers = {
+            key: value
+            for key, value in swagger.headers.items()
+            if key.lower() not in {"content-length", "content-type"}
+        }
+        return HTMLResponse(content=body, status_code=swagger.status_code, headers=response_headers)
+
+    @app.get(app.swagger_ui_oauth2_redirect_url, include_in_schema=False)
+    async def swagger_ui_redirect() -> HTMLResponse:
+        return get_swagger_ui_oauth2_redirect_html()
 
     @app.get("/health", tags=["system"])
     def healthcheck() -> dict[str, str]:

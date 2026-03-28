@@ -1,32 +1,26 @@
 # Roadmap
 
 ## Completed
-- Async backend migration and production-style connection pooling.
-- JWT access/refresh/mfa token model with cookie transport.
-- Redis-backed refresh token lifecycle and replay detection.
-- Session management endpoints.
-- CSRF protection and RBAC (admin MFA claim enforcement).
-- MFA (TOTP) setup/verify and login step-up.
-- Audit log persistence + admin observability endpoint.
-- Optional SMTP security alerts + structured security-event logs.
-- Frontend module with user/admin dashboards.
-- Postman E2E single-run collection.
-- CI test workflow.
+- Async SQLAlchemy migration.
+- JWT access/refresh token creation + verification.
+- HttpOnly cookie-based auth transport.
+- Salted Argon2 password verification.
+- Auth and RBAC dependencies.
+- Core auth boundary test coverage.
+- Refresh token persistence in Redis with rotation tracking and reuse detection.
+- Session table integration with token/session IDs.
+- MFA implementation (TOTP flow).
+- Audit middleware integration.
+- Rate limiting middleware with Redis.
+- CI workflow (tests + migration smoke checks).
+- TOTP secret encryption at rest.
+- OAuth provider integration with Google authorization-code callback.
+- Security alerting pipeline + admin observability APIs (JSON/CSV exports).
+- CI hardening with lint/type/security scans.
+- Postman runner smoke suites for one-click verification.
 
 ## Next Milestones
-1. Backend feature-governance APIs to replace frontend-local admin config placeholders.
-2. CI quality gates:
-   - lint (`ruff`)
-   - type checks (`mypy`)
-   - dependency/container scans.
-3. Production hardening:
-   - secrets rotation policies
-   - environment profile lock-down
-   - cookie/TLS policy validation by environment.
-4. Security analytics:
-   - event dashboards
-   - alert thresholds and escalation.
-5. Expanded security testing:
-   - replay race conditions
-   - cookie/csrf edge paths
-   - abuse-rate testing.
+1. Add GitHub/enterprise IdP OAuth callback flows.
+2. Build SIEM/on-call escalation workflows and runbooks from webhook alerts.
+3. Tighten CI quality gates (turn mypy/bandit/audit into required checks).
+4. Session/device management APIs (list/revoke specific sessions/devices).

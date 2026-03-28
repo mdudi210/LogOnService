@@ -42,6 +42,21 @@ class Settings(BaseSettings):
     RATE_LIMIT_MAX_REQUESTS: int = 120
     RATE_LIMIT_WINDOW_SECONDS: int = 60
     RATE_LIMIT_KEY_PREFIX: str = "rl"
+    RISK_MEDIUM_SCORE_THRESHOLD: int = 40
+    RISK_HIGH_SCORE_THRESHOLD: int = 70
+    ALERT_EMAIL_TO: str = ""
+    ALERT_WEBHOOK_URL: str = ""
+    ALERT_WEBHOOK_TIMEOUT_SECONDS: int = 5
+    ALERT_WEBHOOK_FORMAT: Literal["auto", "slack", "discord"] = "auto"
+    ALERT_MIN_SEVERITY: Literal["low", "medium", "high", "critical"] = "medium"
+    OAUTH_STATE_TTL_SECONDS: int = 600
+    GOOGLE_OAUTH_CLIENT_ID: str = ""
+    GOOGLE_OAUTH_CLIENT_SECRET: str = ""
+    GOOGLE_OAUTH_REDIRECT_URI: str = ""
+    GOOGLE_OAUTH_SCOPES: str = "openid email profile"
+    GOOGLE_OAUTH_AUTH_URL: str = "https://accounts.google.com/o/oauth2/v2/auth"
+    GOOGLE_OAUTH_TOKEN_URL: str = "https://oauth2.googleapis.com/token"
+    GOOGLE_OAUTH_USERINFO_URL: str = "https://openidconnect.googleapis.com/v1/userinfo"
 
     # SMTP (free/self-hosted compatible)
     SMTP_HOST: str = "smtp.gmail.com"

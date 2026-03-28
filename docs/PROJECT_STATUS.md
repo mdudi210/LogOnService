@@ -1,40 +1,38 @@
 # Project Status
 
-Last updated: March 28, 2026
-
 ## Implemented
-- Async backend stack (FastAPI + SQLAlchemy async + PostgreSQL + Redis).
-- JWT cookie auth (`access_token`, `refresh_token`) with CSRF protection.
-- Refresh token state in Redis with metadata, rotation, and reuse/replay detection.
-- Session lifecycle in DB and Redis:
-  - list sessions
-  - revoke one session
-  - revoke all other sessions
-  - revoke all sessions
-- Argon2id password hashing + per-user password salt.
-- Registration + password change workflows.
-- MFA (TOTP setup/verify) + two-step login.
-- `totp_secret` encryption at rest with compatibility for legacy plaintext rows.
-- RBAC with admin MFA claim enforcement.
-- Audit logging persistence (`audit_logs`) and admin security event endpoint.
-- Security observability:
-  - structured security logs
-  - optional SMTP security alerts
-- Frontend module (`frontend/`) with user and admin dashboards.
-- Postman collections including single-run E2E flow.
-- CI pipeline (`.github/workflows/ci.yml`) running tests on push/PR.
+- Async SQLAlchemy infrastructure (`create_async_engine`, `async_sessionmaker`, async dependency injection).
+- PostgreSQL + Redis dockerized local infrastructure with generic env-based configuration.
+- SQLAlchemy models for core auth domain.
+- Alembic migrations:
+  - `20260227_0001` initial schema.
+  - `20260302_0002` add `password_salt`.
+- Salted password hashing workflow using Argon2id.
+- JWT access/refresh token generation + verification.
+- HttpOnly cookie-based token delivery.
+- Auth routes:
+  - `POST /auth/login`
+  - `POST /auth/refresh`
+  - `POST /auth/logout`
+- `get_current_user` JWT dependency.
+- Role-based authorization dependency `require_roles(...)`.
+- Protected route examples:
+  - `GET /users/me`
+  - `GET /users/admin/health` (admin-only)
+- Test suite covering login, token flow, logout, protected routes, and authorization boundaries.
+- TOTP secret encryption-at-rest with legacy plaintext compatibility upgrade path.
+- Runtime audit middleware wiring for auth-sensitive mutating endpoints (fail-open).
+- OAuth account linking/login endpoints and Google authorization-code callback flow.
+- Adaptive risk-scoring engine + high-risk login block policy (when MFA is not enabled).
+- Security alerting pipeline with optional email/webhook delivery.
+- Admin security event observability endpoints (JSON + CSV export).
+- Postman runner smoke collections for auth and admin-security workflows.
 
-## Partially Implemented
-- Admin config dashboard currently persists flags locally in browser storage (frontend placeholder).
+## Seed Users (Dev Only)
+- Admin: `admin@test.local` / `Admin@12345`
+- User: `user@test.local` / `User@12345`
 
-## Remaining
-1. Backend config APIs for admin feature governance.
-2. CI hardening: lint/type checks/security scans.
-3. Production operations hardening:
-   - secret rotation runbooks
-   - metrics/alerts thresholds
-   - stricter environment profiles.
-4. Additional concurrency and negative-path security tests.
-
-## Detailed Analysis
-- See: [COMPLETE_STATUS_2026-03-28.md](/Users/manishdudi/Desktop/LogOnService/docs/COMPLETE_STATUS_2026-03-28.md)
+## Known Placeholders (Not Yet Implemented)
+- Additional OAuth providers (GitHub/enterprise OIDC beyond Google flow).
+- SIEM-native integrations and alert routing playbooks.
+- Session/device self-service management endpoints for end users/admins.

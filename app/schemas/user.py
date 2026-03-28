@@ -1,5 +1,6 @@
+from typing import Optional
+
 from pydantic import BaseModel, Field
-from typing import List
 
 
 class UserSummary(BaseModel):
@@ -15,13 +16,17 @@ class ChangePasswordRequest(BaseModel):
     new_password: str = Field(min_length=8, max_length=255)
 
 
-class SessionSummary(BaseModel):
-    jti: str
-    session_started_at: str
-    session_expires_at: str
-    is_revoked: bool
-    is_current: bool
+class SecurityEventSummary(BaseModel):
+    id: str
+    created_at: str
+    user_id: Optional[str] = None
+    alert_type: str
+    severity: str
+    ip_address: Optional[str] = None
+    user_agent: Optional[str] = None
+    metadata: dict
 
 
-class SessionsListResponse(BaseModel):
-    sessions: List[SessionSummary]
+class SecurityEventListResponse(BaseModel):
+    count: int
+    events: list[SecurityEventSummary]

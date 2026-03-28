@@ -18,6 +18,7 @@ from app.core.constants import ACCESS_TOKEN_TYPE, MFA_TOKEN_TYPE, REFRESH_TOKEN_
 from app.core.redis import get_redis_client
 from app.repositories.audit_repository import AuditRepository
 from app.repositories.session_repository import SessionRepository
+from app.services.alert_service import emit_security_alert
 
 
 class TokenValidationError(Exception):
@@ -342,6 +343,18 @@ async def rotate_refresh_token_or_revoke_all(
                     }
                     for session in active_sessions
                 ],
+            },
+        )
+        await emit_security_alert(
+            db=db,
+            alert_type="REFRESH_TOKEN_REUSE_DETECTED",
+            severity="critical",
+            user_id=UUID(user_id),
+            ip_address=ip_address,
+            user_agent=user_agent,
+            metadata={
+                "triggering_jti": current_jti,
+                "active_refresh_session_count": len(active_sessions),
             },
         )
         await revoke_all_user_sessions_and_tokens(db=db, user_id=user_id, redis_client=redis_conn)

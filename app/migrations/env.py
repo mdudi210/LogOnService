@@ -18,23 +18,15 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
+# Keep Alembic behavior aligned with app runtime config.
 load_dotenv()
 
 
-def _normalize_async_db_url(url: str) -> str:
-    if url.startswith("postgresql+psycopg2://"):
-        return url.replace("postgresql+psycopg2://", "postgresql+asyncpg://", 1)
-    if url.startswith("postgresql://"):
-        return url.replace("postgresql://", "postgresql+asyncpg://", 1)
-    return url
-
-
 def get_database_url() -> str:
-    url = os.getenv(
+    return os.getenv(
         "DATABASE_URL",
         config.get_main_option("sqlalchemy.url"),
     )
-    return _normalize_async_db_url(url)
 
 
 target_metadata = Base.metadata

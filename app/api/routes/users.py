@@ -1,24 +1,27 @@
-from typing import Dict
+import csv
+import io
+import json
+from datetime import datetime
+from typing import Dict, Optional
 from uuid import uuid4
 
-from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
-from fastapi import Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import (
-    get_current_user,
-    require_refresh_cookie,
-    require_roles,
-    verify_csrf,
-)
+from app.api.deps import get_current_user, require_roles, verify_csrf
 from app.core.constants import ROLE_ADMIN
 from app.core.database import get_db
 from app.models.user import User
-from app.repositories.session_repository import SessionRepository
 from app.repositories.audit_repository import AuditRepository
+from app.repositories.session_repository import SessionRepository
 from app.schemas.auth import RefreshResponse
-from app.schemas.audit import AuditEventSummary, AuditEventsResponse
-from app.schemas.user import ChangePasswordRequest, SessionSummary, SessionsListResponse, UserSummary
+from app.schemas.user import (
+    ChangePasswordRequest,
+    SecurityEventListResponse,
+    SecurityEventSummary,
+    UserSummary,
+)
 from app.services.auth_service import AuthService, InvalidOldPasswordError
 from app.services.token_service import (
     build_fingerprint,
@@ -29,9 +32,6 @@ from app.services.token_service import (
     persist_refresh_jti,
     revoke_all_user_sessions_and_tokens,
     set_auth_cookies,
-    TokenValidationError,
-    revoke_jti,
-    verify_refresh_token,
 )
 
 router = APIRouter(prefix="/users", tags=["users"])
@@ -58,28 +58,86 @@ async def admin_health(_: User = Depends(require_roles(ROLE_ADMIN))) -> Dict[str
     return {"status": "ok", "scope": "admin"}
 
 
-@router.get("/admin/security-events", response_model=AuditEventsResponse)
+@router.get("/admin/security-events", response_model=SecurityEventListResponse)
 async def admin_security_events(
-    limit: int = Query(default=50, ge=1, le=200),
-    event_type: str = Query(default=""),
+    limit: int = Query(default=50, ge=1, le=500),
+    severity: Optional[str] = Query(default=None, pattern="^(low|medium|high|critical)$"),
+    alert_type: Optional[str] = Query(default=None, min_length=2, max_length=100),
     _: User = Depends(require_roles(ROLE_ADMIN)),
     db: AsyncSession = Depends(get_db),
-) -> AuditEventsResponse:
-    event_types = [event_type] if event_type else None
-    events = await AuditRepository(db).list_recent_events(limit=limit, event_types=event_types)
-    payload = [
-        AuditEventSummary(
-            id=str(event.id),
-            user_id=str(event.user_id) if event.user_id else None,
-            event_type=event.event_type,
-            ip_address=event.ip_address,
-            user_agent=event.user_agent,
-            metadata=event.event_metadata,
-            created_at=event.created_at.isoformat(),
+) -> SecurityEventListResponse:
+    events = await AuditRepository(db).list_security_events(
+        limit=limit,
+        severity=severity,
+        alert_type=alert_type,
+    )
+    rows = [
+        SecurityEventSummary(
+            id=str(item.id),
+            created_at=item.created_at.isoformat(),
+            user_id=str(item.user_id) if item.user_id else None,
+            alert_type=item.event_metadata.get("alert_type", "unknown"),
+            severity=item.event_metadata.get("severity", "unknown"),
+            ip_address=item.ip_address,
+            user_agent=item.user_agent,
+            metadata=item.event_metadata,
         )
-        for event in events
+        for item in events
     ]
-    return AuditEventsResponse(events=payload)
+    return SecurityEventListResponse(count=len(rows), events=rows)
+
+
+@router.get("/admin/security-events/export")
+async def export_security_events_csv(
+    limit: int = Query(default=500, ge=1, le=5000),
+    severity: Optional[str] = Query(default=None, pattern="^(low|medium|high|critical)$"),
+    alert_type: Optional[str] = Query(default=None, min_length=2, max_length=100),
+    _: User = Depends(require_roles(ROLE_ADMIN)),
+    db: AsyncSession = Depends(get_db),
+) -> StreamingResponse:
+    events = await AuditRepository(db).list_security_events(
+        limit=limit,
+        severity=severity,
+        alert_type=alert_type,
+    )
+
+    output = io.StringIO()
+    writer = csv.writer(output)
+    writer.writerow(
+        [
+            "event_id",
+            "created_at",
+            "user_id",
+            "alert_type",
+            "severity",
+            "ip_address",
+            "user_agent",
+            "metadata_json",
+        ]
+    )
+
+    for item in events:
+        metadata = item.event_metadata or {}
+        writer.writerow(
+            [
+                str(item.id),
+                item.created_at.isoformat(),
+                str(item.user_id) if item.user_id else "",
+                metadata.get("alert_type", "unknown"),
+                metadata.get("severity", "unknown"),
+                item.ip_address or "",
+                item.user_agent or "",
+                json.dumps(metadata, default=str),
+            ]
+        )
+
+    output.seek(0)
+    filename = f"security-events-{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}.csv"
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.post("/me/change-password", response_model=RefreshResponse)
@@ -134,72 +192,3 @@ async def change_password(
     )
     set_auth_cookies(response, access_token, refresh_token)
     return RefreshResponse(message="Password changed successfully")
-
-
-@router.get("/me/sessions", response_model=SessionsListResponse)
-async def list_my_sessions(
-    refresh_token: str = Depends(require_refresh_cookie),
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-) -> SessionsListResponse:
-    try:
-        refresh_payload = verify_refresh_token(refresh_token)
-        current_session_jti = refresh_payload["jti"]
-    except (TokenValidationError, KeyError):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
-
-    sessions = await SessionRepository(db).get_active_sessions(current_user.id)
-    payload = [
-        SessionSummary(
-            jti=session.jti,
-            session_started_at=session.session_started_at.isoformat(),
-            session_expires_at=session.session_expires_at.isoformat(),
-            is_revoked=session.is_revoked,
-            is_current=session.jti == current_session_jti,
-        )
-        for session in sessions
-    ]
-    return SessionsListResponse(sessions=payload)
-
-
-@router.delete("/me/sessions/{jti}", response_model=RefreshResponse)
-async def revoke_my_session(
-    jti: str,
-    _: None = Depends(verify_csrf),
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-) -> RefreshResponse:
-    repo = SessionRepository(db)
-    session = await repo.get_by_jti(jti)
-    if session is None or str(session.user_id) != str(current_user.id):
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Session not found")
-
-    await revoke_jti(user_id=str(current_user.id), jti=jti)
-    await repo.revoke_session_by_jti(jti)
-    return RefreshResponse(message="Session revoked successfully")
-
-
-@router.delete("/me/sessions", response_model=RefreshResponse)
-async def revoke_other_sessions(
-    refresh_token: str = Depends(require_refresh_cookie),
-    _: None = Depends(verify_csrf),
-    current_user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-) -> RefreshResponse:
-    try:
-        refresh_payload = verify_refresh_token(refresh_token)
-        current_jti = refresh_payload["jti"]
-        if str(refresh_payload.get("sub")) != str(current_user.id):
-            raise TokenValidationError("Refresh token subject mismatch")
-    except (TokenValidationError, KeyError):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid refresh token")
-
-    repo = SessionRepository(db)
-    revoked_jtis = await repo.revoke_other_sessions(
-        user_id=current_user.id,
-        exclude_jti=current_jti,
-    )
-    for revoked_jti in revoked_jtis:
-        await revoke_jti(user_id=str(current_user.id), jti=revoked_jti)
-
-    return RefreshResponse(message="Other sessions revoked successfully")
