@@ -23,6 +23,7 @@ from app.schemas.user import (
     UserSummary,
 )
 from app.services.auth_service import AuthService, InvalidOldPasswordError
+from app.services.alert_service import emit_security_alert
 from app.services.token_service import (
     build_fingerprint,
     build_refresh_session_expiry,
@@ -138,6 +139,25 @@ async def export_security_events_csv(
         media_type="text/csv",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+@router.post("/admin/security-events/test-alert", response_model=RefreshResponse)
+async def emit_test_security_alert(
+    request: Request,
+    _: None = Depends(verify_csrf),
+    current_user: User = Depends(require_roles(ROLE_ADMIN)),
+    db: AsyncSession = Depends(get_db),
+) -> RefreshResponse:
+    await emit_security_alert(
+        db=db,
+        alert_type="MANUAL_TEST_ALERT",
+        severity="low",
+        user_id=current_user.id,
+        ip_address=request.client.host if request.client else None,
+        user_agent=request.headers.get("user-agent"),
+        metadata={"source": "admin_test_endpoint"},
+    )
+    return RefreshResponse(message="Test alert emitted")
 
 
 @router.post("/me/change-password", response_model=RefreshResponse)

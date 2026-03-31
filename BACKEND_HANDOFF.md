@@ -118,6 +118,7 @@ If CSRF header is missing or mismatched, backend returns:
 - `GET /users/admin/health` (admin + MFA-authenticated token)
 - `GET /users/admin/security-events`
 - `GET /users/admin/security-events/export` (CSV)
+- `POST /users/admin/security-events/test-alert` (admin + CSRF, emits test alert for email/webhook verification)
 
 ## 6) Frontend Flow (Reference)
 

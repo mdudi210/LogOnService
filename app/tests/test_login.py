@@ -12,7 +12,7 @@ client = TestClient(app)
 class DummyUser:
     def __init__(self):
         self.id = uuid4()
-        self.email = "admin@test.local"
+        self.email = "admin@logonservices.local"
         self.username = "admin_test"
         self.role = "admin"
         self.is_verified = True
@@ -39,7 +39,7 @@ def test_login_success(monkeypatch) -> None:
 
     response = client.post(
         "/auth/login",
-        json={"email_or_username": "admin@test.local", "password": "Admin@12345"},
+        json={"email_or_username": "admin@logonservices.local", "password": "Admin@12345"},
     )
 
     assert response.status_code == 200
@@ -60,7 +60,7 @@ def test_login_invalid_credentials(monkeypatch) -> None:
 
     response = client.post(
         "/auth/login",
-        json={"email_or_username": "admin@test.local", "password": "wrong-password"},
+        json={"email_or_username": "admin@logonservices.local", "password": "wrong-password"},
     )
 
     assert response.status_code == 401

@@ -63,7 +63,7 @@ class Settings(BaseSettings):
     SMTP_PORT: int = 587
     SMTP_USERNAME: str = ""
     SMTP_PASSWORD: str = ""
-    SMTP_FROM_EMAIL: str = "noreply@logonservice.local"
+    SMTP_FROM_EMAIL: str = "noreply@logonservices.local"
     SMTP_STARTTLS: bool = True
     SECURITY_ALERTS_ENABLED: bool = True
     SECURITY_ALERT_EMAIL: str = ""

@@ -29,8 +29,8 @@
 - Postman runner smoke collections for auth and admin-security workflows.
 
 ## Seed Users (Dev Only)
-- Admin: `admin@test.local` / `Admin@12345`
-- User: `user@test.local` / `User@12345`
+- Admin: `admin@logonservices.local` / `Admin@12345`
+- User: `user@logonservices.local` / `User@12345`
 
 ## Known Placeholders (Not Yet Implemented)
 - Additional OAuth providers (GitHub/enterprise OIDC beyond Google flow).

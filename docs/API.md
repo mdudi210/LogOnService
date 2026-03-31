@@ -12,7 +12,7 @@ Base URL: `http://127.0.0.1:8000`
 Request body:
 ```json
 {
-  "email_or_username": "admin@test.local",
+  "email_or_username": "admin@logonservices.local",
   "password": "Admin@12345"
 }
 ```
@@ -22,7 +22,7 @@ Response body:
   "message": "Login successful",
   "user": {
     "id": "...",
-    "email": "admin@test.local",
+    "email": "admin@logonservices.local",
     "username": "admin_test",
     "role": "admin",
     "is_verified": true
@@ -32,6 +32,10 @@ Response body:
 Cookies set:
 - `access_token` (HttpOnly)
 - `refresh_token` (HttpOnly)
+
+### `POST /auth/register`
+- Creates a new user account.
+- Sends welcome email to the registered email address (best-effort).
 
 ### `POST /auth/refresh`
 - Requires `refresh_token` cookie.
@@ -76,6 +80,12 @@ Cookies set:
 ### `GET /users/admin/security-events/export`
 - Admin-only CSV export for incident response workflows.
 - Query params: `limit`, `severity`, `alert_type`.
+
+### `POST /users/admin/security-events/test-alert`
+- Admin-only endpoint to emit a low-severity manual test security alert.
+- Requires auth + CSRF (`X-CSRF-Token`).
+- Useful for validating email/webhook alert delivery with local Mailpit.
+- Security alert emails are sent to configured recipients from `ALERT_EMAIL_TO` and `SECURITY_ALERT_EMAIL` (both support comma-separated values).
 
 ## Auth Error Codes
 - `401 Missing access token`

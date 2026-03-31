@@ -52,6 +52,7 @@ from app.services.auth_service import (
     InvalidCredentialsError,
     UserAlreadyExistsError,
 )
+from app.services.email_service import EmailDeliveryError, send_email
 from app.services.oauth_service import (
     OAuthFlowError,
     SUPPORTED_OAUTH_PROVIDERS,
@@ -90,6 +91,28 @@ async def _upsert_device_best_effort(
             trusted=True,
         )
     except Exception:
+        return
+
+
+async def _send_new_user_email_best_effort(
+    *,
+    email: str,
+    username: str,
+    source: str,
+) -> None:
+    try:
+        await send_email(
+            to_email=email,
+            subject="[LogOnService] Welcome to LogOnService",
+            body_text=(
+                f"Hello {username},\n\n"
+                "Your account has been created successfully.\n"
+                f"Signup source: {source}\n"
+                f"Email: {email}\n"
+            ),
+        )
+    except EmailDeliveryError:
+        # Registration/login should not fail when SMTP is unavailable.
         return
 
 
@@ -157,7 +180,7 @@ async def _ensure_google_oauth_user(
         candidate = f"{safe_base}{suffix}"[:150]
         if not await user_repo.get_by_username(candidate):
             user = User(
-                email=email or f"{candidate}@oauth.local",
+                email=email or f"{candidate}@logonservices.local",
                 username=candidate,
                 role="user",
                 is_active=True,
@@ -166,6 +189,11 @@ async def _ensure_google_oauth_user(
             db.add(user)
             await db.commit()
             await db.refresh(user)
+            await _send_new_user_email_best_effort(
+                email=user.email,
+                username=user.username,
+                source="oauth_google",
+            )
             return user
 
     raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unable to create user")
@@ -545,6 +573,12 @@ async def register(
             status_code=status.HTTP_409_CONFLICT,
             detail=str(exc),
         ) from exc
+
+    await _send_new_user_email_best_effort(
+        email=user.email,
+        username=user.username,
+        source="register",
+    )
 
     return RegisterResponse(
         message="Registration successful",
