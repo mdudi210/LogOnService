@@ -19,6 +19,7 @@ class ChangePasswordRequest(BaseModel):
 class SecurityEventSummary(BaseModel):
     id: str
     created_at: str
+    event_type: str
     user_id: Optional[str] = None
     alert_type: str
     severity: str
@@ -30,3 +31,31 @@ class SecurityEventSummary(BaseModel):
 class SecurityEventListResponse(BaseModel):
     count: int
     events: list[SecurityEventSummary]
+
+
+class SessionSummary(BaseModel):
+    jti: str
+    session_started_at: str
+    session_expires_at: str
+    is_revoked: bool
+    is_current: bool = False
+
+
+class SessionListResponse(BaseModel):
+    count: int
+    sessions: list[SessionSummary]
+
+
+class ActivityEventSummary(BaseModel):
+    id: str
+    created_at: str
+    event_type: str
+    user_id: Optional[str] = None
+    ip_address: Optional[str] = None
+    user_agent: Optional[str] = None
+    metadata: dict
+
+
+class ActivityEventListResponse(BaseModel):
+    count: int
+    events: list[ActivityEventSummary]

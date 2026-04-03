@@ -53,12 +53,19 @@ from app.services.auth_service import (
     UserAlreadyExistsError,
 )
 from app.services.email_service import EmailDeliveryError, send_email
+from app.services.mfa_email_service import (
+    try_send_email_mfa_login_code,
+    verify_email_mfa_login_code,
+)
 from app.services.oauth_service import (
     OAuthFlowError,
     SUPPORTED_OAUTH_PROVIDERS,
+    build_github_authorization_url,
     build_google_authorization_url,
     consume_oauth_state,
+    exchange_github_code_for_tokens,
     exchange_google_code_for_tokens,
+    fetch_github_userinfo,
     fetch_google_userinfo,
     generate_oauth_state,
     maybe_encrypt_token,
@@ -114,6 +121,16 @@ async def _send_new_user_email_best_effort(
     except EmailDeliveryError:
         # Registration/login should not fail when SMTP is unavailable.
         return
+
+
+def _enabled_mfa_methods(user: User) -> list[str]:
+    methods: list[str] = []
+    if getattr(user, "totp_secret", None):
+        methods.append("totp")
+    mfa_methods = getattr(user, "mfa_methods", []) or []
+    if any(item.mfa_type == "email" and item.is_enabled for item in mfa_methods):
+        methods.append("email")
+    return sorted(set(methods))
 
 
 async def _issue_login_session(
@@ -232,6 +249,7 @@ async def login(
     user_agent = request.headers.get("user-agent") or ""
     ip_address = request.client.host if request.client else ""
     fingerprint = build_fingerprint(ip_address)
+    configured_mfa_methods = _enabled_mfa_methods(user) if user.mfa_enabled else []
     is_new_device = False
     if fingerprint:
         try:
@@ -276,17 +294,29 @@ async def login(
                 "reasons": risk.reasons,
             },
         )
-        if not (user.mfa_enabled and user.totp_secret):
+        if not configured_mfa_methods:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="High-risk login blocked. Enable MFA to continue.",
             )
 
-    if user.mfa_enabled and user.totp_secret:
+    enabled_methods = configured_mfa_methods
+    if enabled_methods:
+        if "email" in enabled_methods:
+            delivered = await try_send_email_mfa_login_code(
+                user_id=user.id,
+                to_email=user.email,
+            )
+            if not delivered and enabled_methods == ["email"]:
+                raise HTTPException(
+                    status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                    detail="Unable to deliver MFA email code. Please try again.",
+                )
         return LoginResponse(
             message="MFA required",
             mfa_required=True,
             mfa_token=create_mfa_token(user_id=str(user.id), role=user.role),
+            mfa_methods=enabled_methods,
         )
 
     await _issue_login_session(
@@ -326,16 +356,26 @@ async def login_mfa(
     user = await UserRepository(db).get_by_id_with_relationships(user_id)
     if user is None or user.deleted_at is not None or not user.is_active:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid MFA token")
-    if not user.mfa_enabled or not user.totp_secret:
+    if not user.mfa_enabled:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="MFA is not enabled")
+    enabled_methods = _enabled_mfa_methods(user)
+    if payload.method not in enabled_methods:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="MFA method not enabled")
 
-    decrypted_totp_secret = decrypt_text(user.totp_secret)
-    if not verify_totp_code(secret=decrypted_totp_secret, code=payload.code):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid MFA code")
+    if payload.method == "totp":
+        if not user.totp_secret:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="TOTP MFA is not enabled")
+        decrypted_totp_secret = decrypt_text(user.totp_secret)
+        if not verify_totp_code(secret=decrypted_totp_secret, code=payload.code):
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid MFA code")
 
-    if not is_encrypted_text(user.totp_secret):
-        user.totp_secret = encrypt_text(decrypted_totp_secret)
-        await db.commit()
+        if not is_encrypted_text(user.totp_secret):
+            user.totp_secret = encrypt_text(decrypted_totp_secret)
+            await db.commit()
+    else:
+        is_valid = await verify_email_mfa_login_code(user_id=user.id, code=payload.code)
+        if not is_valid:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid MFA code")
 
     user_agent = request.headers.get("user-agent") or ""
     ip_address = request.client.host if request.client else ""
@@ -445,6 +485,106 @@ async def google_oauth_callback(
 
     return OAuthGoogleCallbackResponse(
         message="Google OAuth login successful",
+        user=LoginUser(
+            id=str(user.id),
+            email=user.email,
+            username=user.username,
+            role=user.role,
+            is_verified=user.is_verified,
+        ),
+    )
+
+
+@router.get("/oauth/github/authorize", response_model=OAuthGoogleAuthorizeResponse)
+async def github_oauth_authorize() -> OAuthGoogleAuthorizeResponse:
+    state = generate_oauth_state()
+    try:
+        authorization_url = build_github_authorization_url(state=state)
+    except OAuthFlowError as exc:
+        raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
+
+    await persist_oauth_state(state=state, provider="github")
+    return OAuthGoogleAuthorizeResponse(authorization_url=authorization_url, state=state)
+
+
+@router.get("/oauth/github/callback", response_model=OAuthGoogleCallbackResponse)
+async def github_oauth_callback(
+    code: str,
+    state: str,
+    request: Request,
+    response: Response,
+    db: AsyncSession = Depends(get_db),
+) -> OAuthGoogleCallbackResponse:
+    state_ok = await consume_oauth_state(state=state, expected_provider="github")
+    if not state_ok:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid OAuth state")
+
+    try:
+        token_payload = await exchange_github_code_for_tokens(code=code)
+        profile = await fetch_github_userinfo(access_token=token_payload["access_token"])
+    except OAuthFlowError as exc:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc)) from exc
+
+    provider_user_id = str(profile["sub"])
+    linked = await OAuthRepository(db).get_by_provider_subject(
+        provider="github",
+        provider_user_id=provider_user_id,
+    )
+
+    if linked is None:
+        user = await _ensure_google_oauth_user(db=db, profile=profile)
+        await OAuthRepository(db).upsert_link(
+            user_id=user.id,
+            provider="github",
+            provider_user_id=provider_user_id,
+            access_token_encrypted=maybe_encrypt_token(token_payload.get("access_token")),
+            refresh_token_encrypted=maybe_encrypt_token(token_payload.get("refresh_token")),
+        )
+        await AuditRepository(db).create_event(
+            user_id=user.id,
+            event_type="OAUTH_ACCOUNT_LINKED",
+            ip_address=request.client.host if request.client else None,
+            user_agent=request.headers.get("user-agent"),
+            metadata={
+                "provider": "github",
+                "provider_user_id": provider_user_id,
+                "flow": "authorization_code_callback",
+            },
+        )
+    else:
+        user = await UserRepository(db).get_by_id_with_relationships(linked.user_id)
+        if user is None:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="OAuth account not linked")
+        await OAuthRepository(db).upsert_link(
+            user_id=user.id,
+            provider="github",
+            provider_user_id=provider_user_id,
+            access_token_encrypted=maybe_encrypt_token(token_payload.get("access_token")),
+            refresh_token_encrypted=maybe_encrypt_token(token_payload.get("refresh_token")),
+        )
+
+    if user.deleted_at is not None or not user.is_active:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User account is inactive")
+
+    user_agent = request.headers.get("user-agent") or ""
+    ip_address = request.client.host if request.client else ""
+    await _issue_login_session(
+        db=db,
+        response=response,
+        user=user,
+        user_agent=user_agent,
+        ip_address=ip_address,
+    )
+    await AuditRepository(db).create_event(
+        user_id=user.id,
+        event_type="OAUTH_LOGIN_SUCCESS",
+        ip_address=ip_address or None,
+        user_agent=user_agent or None,
+        metadata={"provider": "github", "flow": "authorization_code_callback"},
+    )
+
+    return OAuthGoogleCallbackResponse(
+        message="GitHub OAuth login successful",
         user=LoginUser(
             id=str(user.id),
             email=user.email,

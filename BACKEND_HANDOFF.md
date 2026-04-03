@@ -99,13 +99,18 @@ If CSRF header is missing or mismatched, backend returns:
 - `GET /auth/oauth/providers`
 - `GET /auth/oauth/google/authorize`
 - `GET /auth/oauth/google/callback?code=...&state=...`
+- `GET /auth/oauth/github/authorize`
+- `GET /auth/oauth/github/callback?code=...&state=...`
 - `POST /auth/oauth/link` (requires auth + CSRF)
 - `POST /auth/oauth/login`
 
 ## MFA (`/mfa`)
 
+- `GET /mfa/options` (available + enabled methods)
 - `POST /mfa/setup` (requires auth + CSRF)
 - `POST /mfa/verify` (requires auth + CSRF)
+- `POST /mfa/setup/email` (requires auth + CSRF)
+- `POST /mfa/verify/email` (requires auth + CSRF)
 
 ## Users (`/users`)
 

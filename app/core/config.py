@@ -57,6 +57,14 @@ class Settings(BaseSettings):
     GOOGLE_OAUTH_AUTH_URL: str = "https://accounts.google.com/o/oauth2/v2/auth"
     GOOGLE_OAUTH_TOKEN_URL: str = "https://oauth2.googleapis.com/token"
     GOOGLE_OAUTH_USERINFO_URL: str = "https://openidconnect.googleapis.com/v1/userinfo"
+    GITHUB_OAUTH_CLIENT_ID: str = ""
+    GITHUB_OAUTH_CLIENT_SECRET: str = ""
+    GITHUB_OAUTH_REDIRECT_URI: str = ""
+    GITHUB_OAUTH_SCOPES: str = "read:user user:email"
+    GITHUB_OAUTH_AUTH_URL: str = "https://github.com/login/oauth/authorize"
+    GITHUB_OAUTH_TOKEN_URL: str = "https://github.com/login/oauth/access_token"
+    GITHUB_OAUTH_USERINFO_URL: str = "https://api.github.com/user"
+    GITHUB_OAUTH_EMAILS_URL: str = "https://api.github.com/user/emails"
 
     # SMTP (free/self-hosted compatible)
     SMTP_HOST: str = "smtp.gmail.com"

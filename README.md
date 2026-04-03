@@ -19,7 +19,7 @@ LogOnService provides secure authentication primitives for enterprise systems:
 - Async API layer with `FastAPI`
 - Async persistence with `SQLAlchemy 2.x` + `PostgreSQL`
 - Stateful token/session controls with `Redis`
-- Security controls: Argon2id password hashing, JWT cookies, CSRF protection, RBAC, refresh-token reuse detection, audit logging, and TOTP MFA flow
+- Security controls: Argon2id password hashing, JWT cookies, CSRF protection, RBAC, refresh-token reuse detection, audit logging, TOTP MFA, and Email OTP MFA
 
 ## Architecture
 
@@ -42,20 +42,22 @@ LogOnService provides secure authentication primitives for enterprise systems:
 - CSRF double-submit-cookie protection for mutating endpoints
 - Registration and password-change flows
 - TOTP setup/verify and two-step login (`/auth/login` + `/auth/login/mfa`)
+- Email OTP MFA setup/verify and method choice at login (`totp` or `email`)
 - TOTP secret encryption-at-rest (`totp_secret`)
 - RBAC with admin MFA-claim enforcement
 - Adaptive risk-scoring on login + high-risk blocking for users without MFA
-- OAuth account link/login + Google authorization-code callback flow
+- OAuth account link/login + Google/GitHub authorization-code callback flows
 - Security alerting pipeline (audit + optional email/webhook with Slack/Discord templates)
-- Admin security observability APIs (`/users/admin/security-events`, CSV export)
+- Session self-service APIs (`/users/me/sessions*`) for visibility and revoke controls
+- Admin security observability APIs (`/users/admin/security-events`, CSV export, `/users/admin/activity`)
 - Dockerized local stack (`web`, `db`, `redis`, `email`/Mailpit)
 - Containerized integration tests with `testcontainers`
 - CI pipeline with tests/migration checks + quality/security jobs
 
 ### Next Recommended Work
 
-1. Add provider-specific OAuth flows beyond Google callback (GitHub, enterprise IdPs)
-2. Add session/device management APIs (list/revoke by device/session)
+1. Add enterprise OIDC/SAML providers and hardened account-link trust policies
+2. Add device fingerprint confidence scoring + impossible-travel detection
 3. Route alerts to SIEM/on-call tooling and define incident SLAs
 4. Add stricter CI gates for mypy/bandit/pip-audit once baseline debt is reduced
 5. Expand negative-path and abuse-case security regression tests
@@ -196,19 +198,23 @@ docker compose exec web python -m pytest -q app/tests
 ## Test Email Delivery Locally
 
 1. Start stack:
+
 ```bash
 docker compose up -d --build
 ```
+
 2. Login as admin in Swagger (`/docs`) and complete MFA if prompted.
 3. Trigger test alert:
+
 ```bash
 curl -X POST "http://127.0.0.1:8000/users/admin/security-events/test-alert" \
   -H "accept: application/json" \
   -H "X-CSRF-Token: <csrf_token_value>" \
   --cookie "access_token=<access>; csrf_token=<csrf>"
 ```
+
 4. Open Mailpit UI and verify message:
-`http://localhost:8025`
+   `http://localhost:8025`
 
 ## Common Commands
 
@@ -245,3 +251,23 @@ curl -X POST "http://127.0.0.1:8000/auth/login" \
  -d '{"email_or_username":"admin@logonservices.local","password":"Admin@12345"}';
 echo -e "\n------------------";
 done
+
+## QA testing
+
+Created users:
+
+Admin
+Email: admin.qa@logonservices.local
+Username: admin_qa
+Password: AdminQA@12345
+Role: admin
+User
+Email: user.qa@logonservices.local
+Username: user_qa
+Password: UserQA@12345
+Role: user
+Email test result:
+
+Mailpit shows 2 messages delivered:
+to admin.qa@logonservices.local
+to user.qa@logonservices.local

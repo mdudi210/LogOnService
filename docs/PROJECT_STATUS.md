@@ -22,10 +22,12 @@
 - Test suite covering login, token flow, logout, protected routes, and authorization boundaries.
 - TOTP secret encryption-at-rest with legacy plaintext compatibility upgrade path.
 - Runtime audit middleware wiring for auth-sensitive mutating endpoints (fail-open).
-- OAuth account linking/login endpoints and Google authorization-code callback flow.
+- OAuth account linking/login endpoints and Google/GitHub authorization-code callback flow.
 - Adaptive risk-scoring engine + high-risk login block policy (when MFA is not enabled).
 - Security alerting pipeline with optional email/webhook delivery.
 - Admin security event observability endpoints (JSON + CSV export).
+- Session self-service endpoints (`GET /users/me/sessions`, `DELETE /users/me/sessions/{jti}`, `DELETE /users/me/sessions`).
+- Admin activity endpoint (`GET /users/admin/activity`) for auth/session audit visibility.
 - Postman runner smoke collections for auth and admin-security workflows.
 
 ## Seed Users (Dev Only)
@@ -33,6 +35,6 @@
 - User: `user@logonservices.local` / `User@12345`
 
 ## Known Placeholders (Not Yet Implemented)
-- Additional OAuth providers (GitHub/enterprise OIDC beyond Google flow).
+- Enterprise OIDC/SAML integrations and hardened account-link trust policies.
 - SIEM-native integrations and alert routing playbooks.
-- Session/device self-service management endpoints for end users/admins.
+- Banking-grade fraud detection (impossible travel, geo-velocity, behavioral analytics).

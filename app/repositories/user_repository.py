@@ -18,6 +18,7 @@ class UserRepository(BaseRepository[User]):
             .options(
                 selectinload(User.credentials),
                 selectinload(User.sessions),
+                selectinload(User.mfa_methods),
                 selectinload(User.oauth_accounts),
             )
             .where(User.email == email)
@@ -30,6 +31,7 @@ class UserRepository(BaseRepository[User]):
             .options(
                 selectinload(User.credentials),
                 selectinload(User.sessions),
+                selectinload(User.mfa_methods),
                 selectinload(User.oauth_accounts),
             )
             .where(User.username == username)
