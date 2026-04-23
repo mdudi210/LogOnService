@@ -15,8 +15,11 @@ from app.core.database import get_db
 from app.models.user import User
 from app.repositories.audit_repository import AuditRepository
 from app.repositories.session_repository import SessionRepository
+from app.repositories.user_repository import UserRepository
 from app.schemas.auth import RefreshResponse
 from app.schemas.user import (
+    AdminUserAuthListResponse,
+    AdminUserAuthSummary,
     ActivityEventListResponse,
     ActivityEventSummary,
     ChangePasswordRequest,
@@ -64,6 +67,16 @@ async def _audit_best_effort(
     except Exception:
         # Observability should not break auth/session control paths.
         return
+
+
+def _enabled_mfa_methods(user: User) -> list[str]:
+    methods: list[str] = []
+    if getattr(user, "totp_secret", None) and bool(getattr(user, "mfa_enabled", False)):
+        methods.append("totp")
+    for item in getattr(user, "mfa_methods", []) or []:
+        if item.mfa_type == "email" and item.is_enabled:
+            methods.append("email")
+    return sorted(set(methods))
 
 
 @router.get("/health")
@@ -162,6 +175,33 @@ async def revoke_other_sessions(
 @router.get("/admin/health")
 async def admin_health(_: User = Depends(require_roles(ROLE_ADMIN))) -> Dict[str, str]:
     return {"status": "ok", "scope": "admin"}
+
+
+@router.get("/admin/users", response_model=AdminUserAuthListResponse)
+async def admin_users_auth_overview(
+    limit: int = Query(default=100, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
+    _: User = Depends(require_roles(ROLE_ADMIN)),
+    db: AsyncSession = Depends(get_db),
+) -> AdminUserAuthListResponse:
+    users = await UserRepository(db).list_for_admin_auth_view(limit=limit, offset=offset)
+    rows = [
+        AdminUserAuthSummary(
+            id=str(item.id),
+            email=item.email,
+            username=item.username,
+            role=item.role,
+            is_active=item.is_active,
+            is_verified=item.is_verified,
+            mfa_enabled=item.mfa_enabled,
+            enabled_mfa_methods=_enabled_mfa_methods(item),
+            oauth_providers=sorted([account.provider for account in item.oauth_accounts]),
+            created_at=item.created_at.isoformat(),
+            updated_at=item.updated_at.isoformat(),
+        )
+        for item in users
+    ]
+    return AdminUserAuthListResponse(count=len(rows), users=rows)
 
 
 @router.get("/admin/security-events", response_model=SecurityEventListResponse)

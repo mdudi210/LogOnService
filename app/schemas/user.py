@@ -59,3 +59,22 @@ class ActivityEventSummary(BaseModel):
 class ActivityEventListResponse(BaseModel):
     count: int
     events: list[ActivityEventSummary]
+
+
+class AdminUserAuthSummary(BaseModel):
+    id: str
+    email: str
+    username: str
+    role: str
+    is_active: bool
+    is_verified: bool
+    mfa_enabled: bool
+    enabled_mfa_methods: list[str]
+    oauth_providers: list[str]
+    created_at: str
+    updated_at: str
+
+
+class AdminUserAuthListResponse(BaseModel):
+    count: int
+    users: list[AdminUserAuthSummary]

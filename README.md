@@ -232,6 +232,66 @@ docker compose build web
 docker compose logs -f web
 ```
 
+## Graphify Commands (Code Graph Workflow)
+
+Use these commands from the repo root:
+
+```bash
+# Install Graphify
+pip install graphifyy && graphify install
+
+# 1) Build/update code graph from current source
+graphify update .
+
+# 2) Open interactive graph view (macOS)
+open graphify-out/graph.html
+
+# 3) Read generated summary report
+cat graphify-out/GRAPH_REPORT.md
+
+# 4) Ask questions against graph.json
+graphify query "Where is refresh token rotation implemented?"
+
+# 5) Explain one node/module with neighbors
+graphify explain "app/api/routes/auth.py"
+
+# 6) Find shortest dependency path between two nodes
+graphify path "app/main.py" "app/services/token_service.py"
+
+# 7) Keep graph auto-updated while coding
+graphify watch .
+
+# 8) Re-run clustering/report on existing graph data only
+graphify cluster-only .
+
+# 9) Check if semantic refresh is needed (cron/CI friendly)
+graphify check-update .
+
+# 10) Benchmark graph query compression vs naive corpus read
+graphify benchmark graphify-out/graph.json
+```
+
+Optional integration/setup commands:
+
+```bash
+# Install Codex integration snippet into AGENTS.md
+graphify codex install
+
+# Remove Codex integration snippet
+graphify codex uninstall
+
+# Install git hooks for graph upkeep
+graphify hook install
+
+# Check hook status
+graphify hook status
+
+# Remove hooks
+graphify hook uninstall
+```
+
+Note: `graphify view` is not a valid command in this CLI version. Use `open graphify-out/graph.html` instead.
+
 ## Postman Smoke Collections
 
 - Collection: [docs/postman/LogOnService.postman_collection.json](/Users/manishdudi/Desktop/LogOnService/docs/postman/LogOnService.postman_collection.json)
