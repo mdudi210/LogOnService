@@ -32,6 +32,13 @@ services:
       retries: 10
       start_period: 5s
 
+  email:
+    image: axllent/mailpit:latest
+    container_name: logonservice-email
+    ports:
+      - "${MAILPIT_SMTP_PORT:-1025}:1025"
+      - "${MAILPIT_UI_PORT:-8025}:8025"
+
   web:
     build:
       context: .
@@ -42,11 +49,20 @@ services:
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-logonservice}
       REDIS_URL: redis://redis:6379/0
+      SMTP_HOST: email
+      SMTP_PORT: 1025
+      SMTP_STARTTLS: false
+      SMTP_USERNAME: ""
+      SMTP_PASSWORD: ""
+      ALERT_EMAIL_TO: ${ALERT_EMAIL_TO:-security@logonservices.local}
+      SECURITY_ALERT_EMAIL: ${SECURITY_ALERT_EMAIL:-security@logonservices.local}
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
+      email:
+        condition: service_started
     ports:
       - "8000:8000"
     volumes:

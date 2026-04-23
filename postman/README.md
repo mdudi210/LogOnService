@@ -17,10 +17,10 @@ All variables in `LogOnService.local.postman_environment.json` now include dummy
 | Variable | Dummy Value |
 |---|---|
 | `base_url` | `http://127.0.0.1:8000` |
-| `login_identifier` | `admin@test.local` |
+| `login_identifier` | `admin@logonservices.local` |
 | `login_password` | `Admin@12345` |
 | `new_password` | `Admin@12345New` |
-| `new_user_email` | `new.user+1@test.local` |
+| `new_user_email` | `new.user+1@logonservices.local` |
 | `new_user_username` | `new_user_1` |
 | `new_user_password` | `NewUser@12345` |
 | `csrf_token` | `dummy_csrf_token_replace_after_login` |

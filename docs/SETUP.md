@@ -27,7 +27,14 @@ cp .env.example .env
 docker compose --env-file .env -f docker-compose.yaml up -d
 ```
 
-## 4) Apply Migrations
+## 4) Email Container (Mailpit)
+```bash
+cd ../Email
+cp .env.example .env
+docker compose --env-file .env -f docker-compose.yaml up -d
+```
+
+## 5) Apply Migrations
 ```bash
 cd /Users/manishdudi/Desktop/LogOnService
 source .venv/bin/activate
@@ -35,38 +42,24 @@ export DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/logons
 alembic upgrade head
 ```
 
-## 5) Seed Dev Users
+## 6) Seed Dev Users
 ```bash
 cd utilsContainers/Postgre
 docker compose --env-file .env -f docker-compose.yaml exec -T postgres_db \
   psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -f /docker-entrypoint-initdb.d/10-seed-test-users.sql
 ```
 
-## 6) Run API
+## 7) Run API
 ```bash
 cd /Users/manishdudi/Desktop/LogOnService
 source .venv/bin/activate
 uvicorn app.main:app --reload
 ```
 
-## 7) Run Frontend (Optional)
-```bash
-cd /Users/manishdudi/Desktop/LogOnService/frontend
-cp .env.example .env
-npm install
-npm run dev
-```
-
-Containerized frontend dev:
-```bash
-cd /Users/manishdudi/Desktop/LogOnService/frontend
-docker compose up --build frontend-dev
-```
-
 ## 8) Verify
 - Health: `GET http://127.0.0.1:8000/health`
 - Swagger: `http://127.0.0.1:8000/docs`
-- Frontend: `http://localhost:3000`
+- Mailpit UI: `http://localhost:8025`
 
 ## Common Commands
 ```bash
@@ -81,6 +74,10 @@ docker compose --env-file .env -f docker-compose.yaml exec -T postgres_db \
 # check redis
 cd ../Redis
 docker compose --env-file .env -f docker-compose.yaml exec -T redis_cache redis-cli ping
+
+# check email inbox
+cd ../Email
+docker compose --env-file .env -f docker-compose.yaml logs -f
 ```
 
 ## Hostname Consistency Note
