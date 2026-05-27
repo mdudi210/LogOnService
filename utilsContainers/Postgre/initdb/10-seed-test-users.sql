@@ -1,13 +1,13 @@
 -- Idempotent seed data for local testing
--- Admin login: admin@test.local / Admin@12345
--- User login: user@test.local / User@12345
+-- Admin login: admin@logonservices.local / Admin@12345
+-- User login: user@logonservices.local / User@12345
 
 INSERT INTO users (
     id, email, username, role, is_active, is_verified, created_at, updated_at
 )
 VALUES
-    ('11111111-1111-1111-1111-111111111111', 'admin@test.local', 'admin_test', 'admin', TRUE, TRUE, NOW(), NOW()),
-    ('22222222-2222-2222-2222-222222222222', 'user@test.local', 'user_test', 'user', TRUE, TRUE, NOW(), NOW())
+    ('11111111-1111-1111-1111-111111111111', 'admin@logonservices.local', 'admin_test', 'admin', TRUE, TRUE, NOW(), NOW()),
+    ('22222222-2222-2222-2222-222222222222', 'user@logonservices.local', 'user_test', 'user', TRUE, TRUE, NOW(), NOW())
 ON CONFLICT (email) DO UPDATE SET
     username = EXCLUDED.username,
     role = EXCLUDED.role,

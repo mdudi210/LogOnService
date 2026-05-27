@@ -1,64 +1,71 @@
-import { Link, NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { useAuth } from '@/app/AuthContext';
+import { useState } from "react";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import { logout, logoutAll } from "../api/authApi";
+import { ApiError } from "../api/client";
+import { useAuth } from "../auth/AuthContext";
 
-const navClass = ({ isActive }: { isActive: boolean }) =>
-  isActive ? 'nav-link active' : 'nav-link';
+type Props = {
+  role: "admin" | "user";
+  title: string;
+  children: React.ReactNode;
+};
 
-export function AppShell() {
-  const { user, logout } = useAuth();
+export default function AppShell({ role, title, children }: Props) {
+  const location = useLocation();
   const navigate = useNavigate();
+  const { user, setUser } = useAuth();
+  const [error, setError] = useState<string | null>(null);
 
   const onLogout = async () => {
-    await logout();
-    navigate('/login');
+    setError(null);
+    try {
+      await logout();
+      setUser(null);
+      navigate("/auth", { replace: true });
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Logout failed");
+    }
+  };
+
+  const onLogoutAll = async () => {
+    setError(null);
+    try {
+      await logoutAll();
+      setUser(null);
+      navigate("/auth", { replace: true });
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Logout-all failed");
+    }
   };
 
   return (
-    <div className="shell-root">
+    <div className="shell">
       <aside className="sidebar">
-        <Link to="/" className="brand">
-          <span className="brand-dot" />
-          LogOnService
-        </Link>
-
-        <nav className="nav-list">
-          <NavLink to="/" end className={navClass}>
-            Overview
-          </NavLink>
-          <NavLink to="/sessions" className={navClass}>
-            Sessions
-          </NavLink>
-          <NavLink to="/security" className={navClass}>
-            Security
-          </NavLink>
-          {user?.role === 'admin' ? (
-            <>
-              <NavLink to="/admin/events" className={navClass}>
-                Admin Events
-              </NavLink>
-              <NavLink to="/admin/config" className={navClass}>
-                Admin Config
-              </NavLink>
-            </>
-          ) : null}
-        </nav>
-      </aside>
-
-      <main className="main-panel">
-        <header className="topbar">
-          <div>
-            <h1 className="topbar-title">Identity Console</h1>
-            <p className="topbar-subtitle">Role: {user?.role ?? 'guest'}</p>
-          </div>
-          <button className="btn btn-outline" onClick={onLogout}>
+        <h1>LogOnService</h1>
+        <p>{role === "admin" ? "Admin Console" : "User Console"}</p>
+        <nav>
+          <Link className={location.pathname === `/${role}` ? "active" : ""} to={`/${role}`}>
+            Dashboard
+          </Link>
+          <button className="link-btn" onClick={onLogout}>
             Logout
           </button>
+          <button className="link-btn" onClick={onLogoutAll}>
+            Logout All
+          </button>
+        </nav>
+        {error ? <p className="feedback error">{error}</p> : null}
+      </aside>
+      <section className="main-panel">
+        <header className="panel-header">
+          <h2>{title}</h2>
+          <div className="identity-pill">
+            <strong>{user?.username}</strong>
+            <span>{user?.email}</span>
+          </div>
         </header>
-
-        <section className="content-area">
-          <Outlet />
-        </section>
-      </main>
+        {children}
+      </section>
     </div>
   );
 }
