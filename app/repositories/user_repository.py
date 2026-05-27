@@ -18,6 +18,7 @@ class UserRepository(BaseRepository[User]):
             .options(
                 selectinload(User.credentials),
                 selectinload(User.sessions),
+                selectinload(User.mfa_methods),
                 selectinload(User.oauth_accounts),
             )
             .where(User.email == email)
@@ -30,6 +31,7 @@ class UserRepository(BaseRepository[User]):
             .options(
                 selectinload(User.credentials),
                 selectinload(User.sessions),
+                selectinload(User.mfa_methods),
                 selectinload(User.oauth_accounts),
             )
             .where(User.username == username)
@@ -49,3 +51,17 @@ class UserRepository(BaseRepository[User]):
             .where(User.id == user_id)
         )
         return result.scalar_one_or_none()
+
+    async def list_for_admin_auth_view(self, *, limit: int = 100, offset: int = 0) -> list[User]:
+        result = await self.db.execute(
+            select(User)
+            .options(
+                selectinload(User.mfa_methods),
+                selectinload(User.oauth_accounts),
+            )
+            .where(User.deleted_at.is_(None))
+            .order_by(User.created_at.desc())
+            .limit(limit)
+            .offset(offset)
+        )
+        return list(result.scalars().all())

@@ -1,0 +1,7 @@
+services:
+  email:
+    image: axllent/mailpit:latest
+    container_name: logonservice-email
+    ports:
+      - "${MAILPIT_SMTP_PORT:-1025}:1025"
+      - "${MAILPIT_UI_PORT:-8025}:8025"
