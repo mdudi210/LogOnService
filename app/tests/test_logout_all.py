@@ -9,7 +9,7 @@ from app.services.token_service import create_access_token
 class DummyUser:
     def __init__(self):
         self.id = uuid4()
-        self.email = "admin@test.local"
+        self.email = "admin@logonservices.local"
         self.username = "admin_test"
         self.role = "admin"
         self.is_verified = True

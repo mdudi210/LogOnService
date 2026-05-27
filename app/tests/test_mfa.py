@@ -9,7 +9,7 @@ from app.services.token_service import create_mfa_token
 class DummyUser:
     def __init__(self):
         self.id = uuid4()
-        self.email = "admin@test.local"
+        self.email = "admin@logonservices.local"
         self.username = "admin_test"
         self.role = "admin"
         self.is_verified = True
@@ -30,7 +30,7 @@ def test_login_returns_mfa_challenge_when_enabled(monkeypatch) -> None:
     with TestClient(app) as client:
         response = client.post(
             "/auth/login",
-            json={"email_or_username": "admin@test.local", "password": "Admin@12345"},
+            json={"email_or_username": "admin@logonservices.local", "password": "Admin@12345"},
         )
 
     assert response.status_code == 200
