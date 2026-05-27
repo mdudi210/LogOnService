@@ -11,7 +11,7 @@ from app.services.token_service import create_access_token
 class DummyUser:
     def __init__(self):
         self.id = uuid4()
-        self.email = "user@test.local"
+        self.email = "user@logonservices.local"
         self.username = "user_test"
         self.role = "user"
         self.is_verified = True
@@ -170,7 +170,7 @@ def test_login_high_risk_without_mfa_blocked(monkeypatch) -> None:
     with TestClient(app) as client:
         response = client.post(
             "/auth/login",
-            json={"email_or_username": "user@test.local", "password": "User@12345"},
+            json={"email_or_username": "user@logonservices.local", "password": "User@12345"},
         )
 
     assert response.status_code == 403

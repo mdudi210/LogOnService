@@ -707,7 +707,7 @@
     },
     {
       "key": "loginId",
-      "value": "admin@test.local"
+      "value": "admin@logonservices.local"
     },
     {
       "key": "loginPassword",
@@ -715,7 +715,7 @@
     },
     {
       "key": "registerEmail",
-      "value": "postman_user@test.local"
+      "value": "postman_user@logonservices.local"
     },
     {
       "key": "registerUsername",
