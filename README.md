@@ -138,6 +138,9 @@ If host port `6379` is already in use, set `REDIS_HOST_PORT=6380` (or any free p
 docker compose up -d --build
 ```
 
+If you use the bundled frontend container (`http://localhost:5173`), ensure `ALLOWED_CORS_ORIGINS` includes:
+`http://localhost:5173,http://127.0.0.1:5173`
+
 ### 3. Apply migrations
 
 ```bash
@@ -149,6 +152,7 @@ docker compose exec web alembic upgrade head
 - App: `http://localhost:8000`
 - Health: `http://localhost:8000/health`
 - Mailpit UI: `http://localhost:8025`
+- Frontend App: `http://localhost:5173`
 
 ### 5. Run tests
 
@@ -231,6 +235,29 @@ docker compose build web
 # tail web logs
 docker compose logs -f web
 ```
+
+## Frontend Console (User + Admin)
+
+A production-style React frontend is available in `frontend/` with:
+
+- Single command auth page (`/auth`) for both `Sign In` and `Sign Up`
+- OAuth login options (`Google`, `GitHub`)
+- MFA challenge support (`totp` / `email`) during login
+- User dashboard for MFA setup and session visibility/revoke controls
+- Admin dashboard for org users auth posture, security events, activity, and CSV export
+
+Run:
+
+```bash
+cd frontend
+cp .env.example .env
+npm install
+npm run dev
+```
+
+Default frontend URL: `http://127.0.0.1:5173`
+
+Docker compose also starts frontend automatically via the `frontend` service.
 
 ## Graphify Commands (Code Graph Workflow)
 

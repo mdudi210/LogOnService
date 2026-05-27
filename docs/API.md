@@ -91,6 +91,16 @@ Cookies set:
 - Requires role `admin`.
 - Returns `403 Insufficient permissions` for non-admin.
 
+### `GET /users/admin/users`
+- Admin-only users auth posture view for console/dashboards.
+- Query params: `limit`, `offset`
+- Includes per user:
+  - role/active/verified
+  - `mfa_enabled`
+  - `enabled_mfa_methods`
+  - linked `oauth_providers`
+  - created/updated timestamps
+
 ### `GET /users/admin/security-events`
 - Admin-only JSON view of security alerts from audit logs.
 - Query params: `limit`, `severity`, `alert_type`, `event_type`.
