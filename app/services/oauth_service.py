@@ -93,6 +93,21 @@ def build_google_authorization_url(*, state: str) -> str:
     return f"{settings.GOOGLE_OAUTH_AUTH_URL}?{query}"
 
 
+def build_github_authorization_url(*, state: str) -> str:
+    if not settings.GITHUB_OAUTH_CLIENT_ID or not settings.GITHUB_OAUTH_REDIRECT_URI:
+        raise OAuthFlowError("GitHub OAuth is not configured")
+
+    query = urlencode(
+        {
+            "client_id": settings.GITHUB_OAUTH_CLIENT_ID,
+            "redirect_uri": settings.GITHUB_OAUTH_REDIRECT_URI,
+            "scope": settings.GITHUB_OAUTH_SCOPES,
+            "state": state,
+        }
+    )
+    return f"{settings.GITHUB_OAUTH_AUTH_URL}?{query}"
+
+
 async def exchange_google_code_for_tokens(*, code: str) -> dict[str, Any]:
     if (
         not settings.GOOGLE_OAUTH_CLIENT_ID
@@ -134,3 +149,76 @@ async def fetch_google_userinfo(*, access_token: str) -> dict[str, Any]:
     if not payload.get("sub"):
         raise OAuthFlowError("Google userinfo payload missing subject")
     return payload
+
+
+async def exchange_github_code_for_tokens(*, code: str) -> dict[str, Any]:
+    if (
+        not settings.GITHUB_OAUTH_CLIENT_ID
+        or not settings.GITHUB_OAUTH_CLIENT_SECRET
+        or not settings.GITHUB_OAUTH_REDIRECT_URI
+    ):
+        raise OAuthFlowError("GitHub OAuth is not configured")
+
+    async with httpx.AsyncClient(timeout=10) as client:
+        response = await client.post(
+            settings.GITHUB_OAUTH_TOKEN_URL,
+            headers={"Accept": "application/json"},
+            data={
+                "code": code,
+                "client_id": settings.GITHUB_OAUTH_CLIENT_ID,
+                "client_secret": settings.GITHUB_OAUTH_CLIENT_SECRET,
+                "redirect_uri": settings.GITHUB_OAUTH_REDIRECT_URI,
+            },
+        )
+    if response.status_code >= 400:
+        raise OAuthFlowError("GitHub token exchange failed")
+
+    payload = response.json()
+    if "access_token" not in payload:
+        raise OAuthFlowError("GitHub token exchange returned invalid payload")
+    return payload
+
+
+async def fetch_github_userinfo(*, access_token: str) -> dict[str, Any]:
+    async with httpx.AsyncClient(timeout=10) as client:
+        user_response = await client.get(
+            settings.GITHUB_OAUTH_USERINFO_URL,
+            headers={
+                "Authorization": f"Bearer {access_token}",
+                "Accept": "application/json",
+            },
+        )
+        if user_response.status_code >= 400:
+            raise OAuthFlowError("GitHub userinfo request failed")
+        user_payload = user_response.json()
+
+        if not user_payload.get("id"):
+            raise OAuthFlowError("GitHub userinfo payload missing subject")
+
+        email = user_payload.get("email")
+        if not email:
+            emails_response = await client.get(
+                settings.GITHUB_OAUTH_EMAILS_URL,
+                headers={
+                    "Authorization": f"Bearer {access_token}",
+                    "Accept": "application/json",
+                },
+            )
+            if emails_response.status_code < 400:
+                emails_payload = emails_response.json()
+                primary = next(
+                    (
+                        item
+                        for item in emails_payload
+                        if item.get("primary") and item.get("verified")
+                    ),
+                    None,
+                )
+                if primary:
+                    email = primary.get("email")
+
+    return {
+        "sub": str(user_payload["id"]),
+        "email": (email or "").strip().lower() if email else "",
+        "name": user_payload.get("name") or user_payload.get("login") or "github_user",
+    }

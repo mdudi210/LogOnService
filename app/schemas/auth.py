@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field
 
@@ -21,6 +21,7 @@ class LoginResponse(BaseModel):
     user: Optional[LoginUser] = None
     mfa_required: bool = False
     mfa_token: Optional[str] = None
+    mfa_methods: Optional[list[str]] = None
 
 
 class RefreshResponse(BaseModel):
@@ -40,6 +41,7 @@ class RegisterResponse(BaseModel):
 
 class LoginMFARequest(BaseModel):
     mfa_token: str
+    method: Literal["totp", "email"] = "totp"
     code: str = Field(min_length=6, max_length=8)
 
 

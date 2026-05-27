@@ -12,3 +12,17 @@ class MFAVerifyRequest(BaseModel):
 
 class MFAVerifyResponse(BaseModel):
     message: str
+
+
+class MFAEmailSetupResponse(BaseModel):
+    message: str
+    expires_in_seconds: int
+
+
+class MFAOptionsResponse(BaseModel):
+    available_methods: list[str]
+    enabled_methods: list[str]
+
+
+class MFAEmailVerifyRequest(BaseModel):
+    code: str = Field(min_length=6, max_length=8)

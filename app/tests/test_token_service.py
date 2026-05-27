@@ -56,7 +56,7 @@ def test_refresh_verify_rejects_access_token() -> None:
 async def _create_user(db) -> User:
     suffix = uuid4().hex[:10]
     user = User(
-        email=f"token-{suffix}@test.local",
+        email=f"token-{suffix}@logonservices.local",
         username=f"token_{suffix}",
         role="admin",
         is_active=True,
