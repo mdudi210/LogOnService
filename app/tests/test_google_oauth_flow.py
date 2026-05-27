@@ -8,7 +8,7 @@ from app.main import app
 class DummyUser:
     def __init__(self):
         self.id = uuid4()
-        self.email = "google.user@test.local"
+        self.email = "google.user@logonservices.local"
         self.username = "google_user"
         self.role = "user"
         self.is_verified = True

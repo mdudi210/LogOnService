@@ -46,3 +46,19 @@ class AuditRepository(BaseRepository[AuditLog]):
         query = query.order_by(desc(AuditLog.created_at)).limit(limit)
         result = await self.db.execute(query)
         return list(result.scalars().all())
+
+    async def list_recent_events(
+        self,
+        *,
+        limit: int = 50,
+        event_types: Optional[list[str]] = None,
+        user_id: Optional[UUID] = None,
+    ) -> list[AuditLog]:
+        query = select(AuditLog)
+        if user_id:
+            query = query.where(AuditLog.user_id == user_id)
+        if event_types:
+            query = query.where(AuditLog.event_type.in_(event_types))
+        query = query.order_by(desc(AuditLog.created_at)).limit(limit)
+        result = await self.db.execute(query)
+        return list(result.scalars().all())

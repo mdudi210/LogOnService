@@ -34,6 +34,22 @@ def _resolve_webhook_format(url: str) -> str:
     return "slack"
 
 
+def _parse_recipients(raw: str) -> list[str]:
+    text = (raw or "").strip()
+    if not text:
+        return []
+    return [item.strip() for item in text.split(",") if item.strip()]
+
+
+def _resolve_email_recipients() -> list[str]:
+    recipients: list[str] = []
+    for value in (settings.ALERT_EMAIL_TO, settings.SECURITY_ALERT_EMAIL):
+        for email in _parse_recipients(value):
+            if email not in recipients:
+                recipients.append(email)
+    return recipients
+
+
 def _build_webhook_payload(
     *,
     webhook_format: str,
@@ -131,10 +147,11 @@ async def emit_security_alert(
         json.dumps(metadata, default=str),
     )
 
-    if settings.ALERT_EMAIL_TO:
+    recipients = _resolve_email_recipients()
+    for recipient in recipients:
         try:
             await send_email(
-                to_email=settings.ALERT_EMAIL_TO,
+                to_email=recipient,
                 subject=f"[LogOnService][{severity.upper()}] {alert_type}",
                 body_text=json.dumps(
                     {
@@ -151,7 +168,7 @@ async def emit_security_alert(
             )
         except EmailDeliveryError:
             # Alerts must not block auth traffic.
-            pass
+            continue
 
     if not settings.ALERT_WEBHOOK_URL:
         return
